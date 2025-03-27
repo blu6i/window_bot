@@ -8,6 +8,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import NoSuchElementException, TimeoutException, WebDriverException
 from time import sleep
 import re
+from pdf_parser import pdf_to_csv
 
 
 options = Options()
@@ -55,6 +56,7 @@ try:
     else:
         for name, link in schedule_data.items():
             print(f"Группа: {name}\nСсылка: {link}\n{'=' * 50}")
+            pdf_to_csv(link, name)
         print(dataRange)
 
 except TimeoutException:
