@@ -7,19 +7,13 @@ from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
+from selenium.webdriver.remote.webdriver import WebDriver
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
 from webdriver_manager.chrome import ChromeDriverManager
 
 from utils import logger
 
-"""
-    Дописать логгер ошибок
-    Заполнить комментариями
-    Реализовать передачу в ПДФ парсер
-"""
-
-#logger = logging.getLogger(__name__)
 LINK = "https://www.vyatsu.ru/studentu-1/spravochnaya-informatsiya/raspisanie-zanyatiy-dlya-studentov.html"
 
 FACULTIES = {
@@ -43,7 +37,7 @@ FACULTIES = {
 }
 
 
-def setup_driver():
+def setup_driver() -> WebDriver:
     """Настройка и инициализация веб-драйвера"""
     options = Options()
     options.add_argument("--disable-extensions")
@@ -60,7 +54,7 @@ def setup_driver():
         raise
 
 
-def init_driver():
+def init_driver() -> tuple[WebDriver, WebDriverWait]:
     driver = setup_driver()
     wait = WebDriverWait(driver, 15)
     return driver, wait
@@ -70,7 +64,7 @@ def parse_group_name(
         group_name: str,
         faculty: str,
         schedule_url: str,
-) -> dict[str, str | Any] | None:
+) -> dict[str, Any] | None:
     """Заполняет информацию об группе и возвращает словарь с информацией или None.
 
     Args:
@@ -137,8 +131,7 @@ def get_actual_date() -> list[str]:
     - Следующий двухнедельный диапазон
     Формат каждой строки: "DDMMYYYY_DDMMYYYY"
     """
-    #current_date = date.today()
-    current_date = date(2025, 3, 25)
+    current_date = date.today()
     semester_start = get_current_semester_start(current_date)
 
     if current_date < semester_start:
@@ -164,7 +157,7 @@ def get_actual_date() -> list[str]:
     ]
 
 
-def parse_schedule(link):
+def parse_schedule(link: str) -> list[dict[str, Any] | None]:
     """Основная логика парсинга расписания"""
     try:
         # Инициализация драйвера
@@ -194,7 +187,6 @@ def parse_schedule(link):
             period_list = element.find_elements(By.CLASS_NAME, 'listPeriod')
             # Имена групп
             group_list = element.find_elements(By.CLASS_NAME, 'grpPeriod')
-            #print(f'Групп: {len(group_list)} - расписаний: {len(period_list)}')
 
             for i in range(len(period_list)):
                 link_list = period_list[i].find_elements(By.TAG_NAME, 'a')
@@ -207,8 +199,6 @@ def parse_schedule(link):
                             form = parse_group_name(group_name=group_list[i].text,
                                                     faculty=fak_name,
                                                     schedule_url=url)
-                            #file_name = parser_pdf(form)
-                            #print(f'Saved in {file_name}')
                             logger.info(f'У группы {group_list[i].text} найдено расписание за {year}')
                             groups.append(form)
         logger.info('Парсинг сайта завершено успешно')
@@ -223,7 +213,6 @@ def main():
     """Основная функция"""
     try:
         parse_schedule(LINK)
-
 
     finally:
         print('exit')
