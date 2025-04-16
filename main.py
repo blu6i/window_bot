@@ -14,7 +14,7 @@ def get_unique_subjects_from_csvs(folder_path: str, output_file: str = 'subjects
 
     Args:
         folder_path: Путь к папке с CSV файлами
-        output_file: Имя выходного файла (по умолчанию 'unique_subjects.txt')
+        output_file: Имя выходного файла (по умолчанию 'subjects.txt')
     """
 
     # Собираем все CSV файлы в папке
@@ -28,19 +28,19 @@ def get_unique_subjects_from_csvs(folder_path: str, output_file: str = 'subjects
         try:
             # Читаем CSV файл
             df = pd.read_csv(file_path)
-            unique_subjects.update(df['Subject'].unique())
-            for i in df['Subject'].unique():
+            unique_subjects.update(df['subject'].unique())
+            for i in df['subject'].unique():
                 if i == 'nan': print(file_path)
 
         except Exception as e:
-            print(f"Ошибка при обработке файла {csv_file}: {str(e)}")
+            print(f'Ошибка при обработке файла {csv_file}: {str(e)}')
     sorted_unique_subjects = unique_subjects
     # Сохраняем результат в файл
     with open(output_file, 'w', encoding='utf-8') as f:
         f.write('INSERT INTO Subjects(SubjectName) VALUES\n')
         for subject in sorted_unique_subjects:
-            f.write(f"(\'{subject}\'),\n")
-    print(f"Уникальные предметы сохранены в файл {output_file}")
+            f.write(f'(\'{subject}\'),\n')
+    print(f'Уникальные предметы сохранены в файл {output_file}')
 
 
 def main():

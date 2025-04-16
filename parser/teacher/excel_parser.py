@@ -9,8 +9,8 @@ import requests
 from utils import logger
 
 KEYWORDS = ['Практическое', 'Лекция', 'Лабораторная', 'Консультация', 'Экзамен', 'Зачет', 'Защита ВКР']
-DAYS_OF_WEEK = ["Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота"]
-FIRST_CLASS_TIME = "08:20-09:50"
+DAYS_OF_WEEK = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота']
+FIRST_CLASS_TIME = '08:20-09:50'
 TIME_PATTERN = re.compile(r'^\d{2}:\d{2}-\d{2}:\d{2}$')
 GROUP_PATTERN = re.compile(
     r'\b[А-ЯЁа-яё]{1,6}'
@@ -18,21 +18,15 @@ GROUP_PATTERN = re.compile(
     r'\d{4}-'
     r'\d{2}-\d{2}\b'
 )
-# Формат аудитории
-CLASS_PATTERN = re.compile(r'\b\d{1,2}\s*-\s*\d{3}[А-ЯЁа-яё_]?[А-ЯЁа-яё_]?\b')
-# Формат цифр в скокбах
-NUM_PATTERN = re.compile(r'\(\d+ \d+\)')
 
 
 def parse_schedule_table(link: str, departament: str, faculty: str) -> pd.DataFrame:
     """
     Парсит Excel-файл с расписанием, обрабатывая данные по столбцам (по преподавателям).
-
     Args:
         link (str): Путь к файлу Excel
         departament (str): кафедра
         faculty (str): факультет
-
     Returns:
         pd.DataFrame: DataFrame в формате [teacher, date, day, time, schedule]
     """
@@ -74,67 +68,16 @@ def parse_schedule_table(link: str, departament: str, faculty: str) -> pd.DataFr
     return result_df
 
 
-'''def format_class(study: str) -> str:
-    """
-    Форматирует строку с названием занятия:
-    1. Удаляет название группы, если оно есть
-    2. Удаляет номера аудиторий
-    3. Обрезает до первого типа занятия
-
-    Args:
-        study: Исходная строка с названием занятия
-
-    Returns:
-        Отформатированная строка или пустая строка, если нет занятия
-    """
-    if study == 'nan':
-        return ''
-    # Удаляем название группы, если оно есть
-    cleaned_text = re.sub(GROUP_PATTERN, "", str(study)).rstrip('.').strip()
-
-    # Удаляем номера аудиторий формата "8-310А"
-    cleaned_text = re.sub(CLASS_PATTERN, '', cleaned_text)
-
-    # Удаляем цифры в скобках
-    cleaned_text = re.sub(NUM_PATTERN, '', cleaned_text)
-
-    # Проверяем наличие русских заглавных букв
-    uppercase_in_text = None
-    for s in cleaned_text:
-        if s.isupper():
-            uppercase_in_text = s
-            break
-
-    # Определяем позиции ключевых слов
-    positions = None
-    for keyword in KEYWORDS:
-        pos = cleaned_text.find(keyword)
-        if pos != -1:
-            positions = pos
-            break
-
-    # Если нашли ключевые слова - обрезаем до первого из них
-    if positions:
-        start = cleaned_text.find(uppercase_in_text)
-        return cleaned_text[start:positions].strip()
-
-    # Если ключевых слов нет, возвращаем текст от первой заглавной буквы
-    start = cleaned_text.find(uppercase_in_text)
-    format_text = cleaned_text.split(',')[0]
-    return format_text[start:].strip()'''
-
-
 def process_schedule_info(schedule_info: str, teacher: str, time: str) -> list[dict[str, str | None]]:
     """
     Извлечения групп из расписания
-    :arg:
+    Args:
         schedule_info (str) - расписание
         teacher (str) - ФИО преподавателя
         time (str) - время
-    :returns:
+    Returns:
         Массив со словарями
     """
-    #schedule = remove_breaks(schedule_info)
     groups_list = re.findall(GROUP_PATTERN, str(schedule_info))
     clear_schedule = format_class(schedule_info)
     teacher_schedule = []
@@ -159,11 +102,12 @@ def process_schedule_info(schedule_info: str, teacher: str, time: str) -> list[d
 
 
 def add_dates_to_schedule(df: pd.DataFrame, patch: str) -> pd.DataFrame:
-    """Добавляет столбцы с датой и днём недели в DataFrame расписания.
-    :arg
+    """
+    Добавляет столбцы с датой и днём недели в DataFrame расписания.
+    Args:
         df (dataframe) - dataframe с расписанием
         patch (str) - ссылка на расписание
-    :returns
+    Returns:
         Обновленный dataframe с датой
     """
     date_match = re.search(r'(\d{8}_\d{8})', patch.split('/')[-1])

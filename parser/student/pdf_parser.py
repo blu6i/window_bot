@@ -9,9 +9,10 @@ from pandas import DataFrame
 from parser.utils.formating_str import format_class
 from utils import logger
 
-DAYS_OF_WEEK = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье']
+DAYS_OF_WEEK = ['понедельник', 'вторник', 'среда', 'четверг', 'пятница', 'суббота', 'воскресенье']
 FIRST_CLASS_TIME = "08:20-09:50"
 TIME_PATTERN = re.compile(r'\d{2}:\d{2}-\d{2}:\d{2}')
+DATE_PATTER = re.compile(r'\b\d{2}\.\d{2}\.\d{2}\b')
 GROUP_PATTERN = re.compile(
     r'^(?P<direction>[А-ЯЁа-яё]{1,6})'
     r'(?P<education_level>[а-яё])-'
@@ -34,7 +35,6 @@ def is_time(cell: str) -> bool:
 def parse_pdf_to_dataframe(pdf_content: bytes) -> pd.DataFrame:
     """
     Парсит PDF файл и возвращает DataFrame с временем и расписанием.
-
     Args:
         pdf_content: byte файл с расписанием
     Returns:
@@ -55,6 +55,8 @@ def parse_pdf_to_dataframe(pdf_content: bytes) -> pd.DataFrame:
     processed_data = []
     current_time = None
     current_subject = None
+    current_date = None
+    current_day = None
     last_time = None
     list_subject = []
     count = 0
@@ -67,10 +69,25 @@ def parse_pdf_to_dataframe(pdf_content: bytes) -> pd.DataFrame:
             if len(cells) > 0:
                 current_time = cells[1] if is_time(cells[1]) else current_time  # Время всегда в первой ячейке
                 current_subject = format_class(cells[2]) if len(cells) > 1 and cells[2] else ""
-                print(f'До {count} | {current_time} | {current_subject}')
-                #t = input()
             elif current_time is None:
                 continue
+
+            if cells[0]:
+                t = cells[0].split()
+                if len(t) == 2:
+                    current_day = t[0]
+                    date = t[1].split('.')
+                    print(date)
+                    current_date = f'20{date[2]}-{date[1]}-{date[0]}'
+                elif len(t) > 2:
+                    for day in DAYS_OF_WEEK:
+                        if day in cells[0]:
+                            current_day = day
+                        m = re.search(DATE_PATTER, cells[0])
+                        if m:
+                            date = m.group(0).split('.')
+                            print(date)
+                            current_date = f'20{date[2]}-{date[1]}-{date[0]}'
 
             # Проверка что найденно расписание или время
             if current_subject or current_time:
@@ -80,18 +97,14 @@ def parse_pdf_to_dataframe(pdf_content: bytes) -> pd.DataFrame:
                     last_time = current_time
                 # Проверяем, что текущая пара не дублирует предыдущие
                 if not (current_subject in list_subject):
-                    processed_data.append((current_time, current_subject))
+                    processed_data.append((current_date, current_day, current_time, current_subject))
                     last_time = current_time
                     list_subject.append(current_subject)
-                    print(list_subject)
-                    print(f'После {count} | {current_time} | {current_subject}')
-                    #t = input()
-
 
     if not processed_data:
         raise ValueError("Не найдено данных для сохранения")
 
-    return pd.DataFrame(processed_data, columns=["time", "subject"])
+    return pd.DataFrame(processed_data, columns=["date", "day", "time", "subject"])
 
 
 def add_date_of_week(dataframe: pd.DataFrame, str_date: str) -> pd.DataFrame:
@@ -153,19 +166,19 @@ def parser_pdf(group_data: dict) -> DataFrame:
         df = parse_pdf_to_dataframe(response.content)
 
         # Извлекаем дату из URL
-        date_match = re.search(r'(\d{8}_\d{8})', group_data['schedule_url'])
-        if not date_match:
-            raise ValueError("Не удалось извлечь дату из URL расписания")
-        start_date = date_match.group(1).split('_')[0]
+        # date_match = re.search(r'(\d{8}_\d{8})', group_data['schedule_url'])
+        # if not date_match:
+        #    raise ValueError("Не удалось извлечь дату из URL расписания")
+        # start_date = date_match.group(1).split('_')[0]
 
         # Добавляем даты
-        df = add_date_of_week(df, start_date)
+        # df = add_date_of_week(df, start_date)
 
         # Добавляем информацию о группе
         group_match = re.fullmatch(GROUP_PATTERN, group_data['group'])
         if not group_match:
             raise ValueError(f"Неверный формат группы: {group_data['group']}")
-        df = df[df['day'] != 'Воскресенье']
+        df = df[df['day'] != 'воскресенье']
         df.insert(0, 'education_form', group_match.group('education_form'))
         df.insert(0, 'institute', group_match.group('institute'))
         df.insert(0, 'education_level', group_match.group('education_level'))
@@ -188,7 +201,7 @@ def main():
     group_data = {
         'group': 'ПОДб-1701-08-00',
         'faculty': 'Пед',
-        'schedule_url': 'https://www.vyatsu.ru/reports/schedule/Group/23993_2_14042025_27042025.pdf'
+        'schedule_url': 'https://www.vyatsu.ru/reports/schedule/Group/24094_2_31032025_13042025.pdf'
     }
     try:
         filename = parser_pdf(group_data)
