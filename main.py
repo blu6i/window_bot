@@ -2,6 +2,9 @@ from parser import groups_web_parse, groups_pdf_parse, teacher_web_parse, teache
 from utils import logger
 import os
 import pandas as pd
+import sql
+import sqlite3
+
 
 #LINK = "https://www.vyatsu.ru/studentu-1/spravochnaya-informatsiya/teacher.html"
 LINK = 'https://www.vyatsu.ru/studentu-1/spravochnaya-informatsiya/raspisanie-zanyatiy-dlya-studentov.html'
@@ -44,7 +47,15 @@ def get_unique_subjects_from_csvs(folder_path: str, output_file: str = 'subjects
 
 
 def main():
-    groups = groups_web_parse(LINK)
+    database = "proekt.db"
+
+    conn = sql.create_connection(database)
+
+    if conn is not None:
+        # Создание таблиц
+        sql.create_tables(conn)
+
+    '''groups = groups_web_parse(LINK)
     for group_data in groups:
         try:
             group = groups_pdf_parse(group_data)
@@ -52,7 +63,7 @@ def main():
             group.to_excel(file_name, index=False)
             logger.info(f'Данные сохранены в {file_name}')
         except Exception as e:
-            logger.info(f'Ошибка обработки {group_data['group']}\n{str(e)}')
+            logger.info(f'Ошибка обработки {group_data['group']}\n{str(e)}')'''
 
     '''teachers = teacher_web_parse(LINK)
     for t in teachers:
