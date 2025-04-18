@@ -8,6 +8,6 @@ __pycache__/
 .idea/
 old_version/
 logs/
-data/
+trash/data/
 trash/
 *.xlsx

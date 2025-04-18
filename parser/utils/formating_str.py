@@ -42,7 +42,7 @@ def format_class(study: str) -> str:
     Returns:
         Отформатированная строка или пустая строка, если нет занятия
     """
-    if study == 'nan':
+    if str(study) == 'nan':
         return ''
     study = fix_line_breaks(study)
     # Удаляем название группы, если оно есть
@@ -56,7 +56,6 @@ def format_class(study: str) -> str:
 
     # Удаляем фамилии (Опционально для расписания студентов)
     cleaned_text = re.sub(FIO_PATTERN, '', cleaned_text)
-
     # Проверка, что после чистки строка не стала пустой или цифрой
     if not cleaned_text or cleaned_text.isnumeric():
         return ''

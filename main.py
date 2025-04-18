@@ -1,13 +1,13 @@
 from parser import groups_web_parse, groups_pdf_parse, teacher_web_parse, teacher_excel_parse
-from utils import logger
+from utils import logger, import_excel_subjects
 import os
 import pandas as pd
 import sql
 import sqlite3
 
 
-#LINK = "https://www.vyatsu.ru/studentu-1/spravochnaya-informatsiya/teacher.html"
-LINK = 'https://www.vyatsu.ru/studentu-1/spravochnaya-informatsiya/raspisanie-zanyatiy-dlya-studentov.html'
+LINK = "https://www.vyatsu.ru/studentu-1/spravochnaya-informatsiya/teacher.html"
+# LINK = 'https://www.vyatsu.ru/studentu-1/spravochnaya-informatsiya/raspisanie-zanyatiy-dlya-studentov.html'
 
 
 def get_unique_subjects_from_csvs(folder_path: str, output_file: str = 'subjects.txt') -> None:
@@ -74,7 +74,11 @@ def main():
         logger.info(f'Сохранено {t['departament']}')
         teacher.to_excel(file_name, index=False)'''
 
-    #get_unique_subjects_from_csvs('data')
+    import_excel_subjects('data')
+    #with open('subjects.txt', 'r', encoding='utf-8') as file:
+    #    lines = [line.strip() for line in file if line.strip()]
+    sql.add_info.add_subjects(conn=conn,
+                              subject_names=lines)
 
 
 if __name__ == '__main__':

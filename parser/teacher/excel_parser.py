@@ -57,6 +57,7 @@ def parse_schedule_table(link: str, departament: str, faculty: str) -> pd.DataFr
                         result_data.append(schedule)
             logger.info(f'Расписание {teacher} добавлено')
         except Exception as e:
+            t = input()
             logger.warning(f'Ошибка при добавлении расписания {teacher} | {str(e)}')
 
     # Создаем DataFrame
@@ -79,13 +80,16 @@ def process_schedule_info(schedule_info: str, teacher: str, time: str) -> list[d
         Массив со словарями
     """
     groups_list = re.findall(GROUP_PATTERN, str(schedule_info))
-    clear_schedule = format_class(schedule_info)
+    if schedule_info:
+        clear_schedule = format_class(schedule_info)
+    else:
+        clear_schedule = ''
     teacher_schedule = []
     if not groups_list:
         teacher_schedule.append({
             'teacher': teacher,
             'time': time,
-            'schedule': None,
+            'subject': None,
             'group': None
         })
     last_group = ''
@@ -94,7 +98,7 @@ def process_schedule_info(schedule_info: str, teacher: str, time: str) -> list[d
             teacher_schedule.append({
                 'teacher': teacher,
                 'time': time,
-                'schedule': clear_schedule,
+                'subject': clear_schedule,
                 'group': group
             })
         last_group = group
