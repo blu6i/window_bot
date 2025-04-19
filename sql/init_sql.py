@@ -1,5 +1,6 @@
 import sqlite3
 from utils import logger
+from sql.add_info import *
 
 
 def create_connection(db_file):
@@ -15,61 +16,19 @@ def create_connection(db_file):
 
 
 def create_tables(conn):
-    """Создание всех таблиц"""
+    """Создание всех таблиц с обновленной структурой"""
     try:
         cursor = conn.cursor()
-        # Уровень образоания
+
+        # 1. Уровни образования
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS EducationalLevel (
             LevelID INTEGER PRIMARY KEY AUTOINCREMENT,
-            LevelName TEXT NOT NULL UNIQUE
+            LevelName TEXT NOT NULL UNIQUE,
+            ShortName TEXT NOT NULL UNIQUE
         )""")
-        # Факультеты
-        cursor.execute("""
-        CREATE TABLE IF NOT EXISTS Faculties (
-            FacultyID INTEGER PRIMARY KEY AUTOINCREMENT,
-            FacultyName TEXT NOT NULL UNIQUE,
-            InstituteID INTEGER NOT NULL,
-            FOREIGN KEY (InstituteID) REFERENCES Institutes(InstituteID)
-        )""")
-        # Направления
-        cursor.execute("""
-        CREATE TABLE IF NOT EXISTS Specializations (
-            SpecializationID INTEGER PRIMARY KEY AUTOINCREMENT,
-            SpecializationName TEXT NOT NULL UNIQUE,
-            ShortName TEXT NOT NULL UNIQUE,
-            FacultyID INTEGER NOT NULL,
-            LevelID INTEGER NOT NULL,
-            FOREIGN KEY (FacultyID) REFERENCES Faculties(FacultyID),
-            FOREIGN KEY (LevelID) REFERENCES EducationalLevel(LevelID)
-        )""")
-        # Группа
-        cursor.execute("""
-        CREATE TABLE IF NOT EXISTS Groups (
-            GroupID INTEGER PRIMARY KEY AUTOINCREMENT,
-            GroupName TEXT NOT NULL UNIQUE,
-            SpecializationID INTEGER NOT NULL,
-            CourseNumber INTEGER NOT NULL CHECK (CourseNumber BETWEEN 1 AND 6),
-            FOREIGN KEY (SpecializationID) REFERENCES Specializations(SpecializationID)
-        )""")
-        # Предмет
-        cursor.execute("""
-        CREATE TABLE IF NOT EXISTS Subjects (
-            SubjectID INTEGER PRIMARY KEY AUTOINCREMENT,
-            SubjectName TEXT NOT NULL UNIQUE
-        )""")
-        # Расписание
-        cursor.execute("""
-        CREATE TABLE IF NOT EXISTS Schedule (
-            ScheduleID INTEGER PRIMARY KEY AUTOINCREMENT,
-            GroupID INTEGER NOT NULL,
-            Date TEXT NOT NULL,
-            Time TEXT NOT NULL,
-            SubjectID INTEGER NOT NULL,
-            FOREIGN KEY (GroupID) REFERENCES Groups(GroupID),
-            FOREIGN KEY (SubjectID) REFERENCES Subjects(SubjectID)
-        )""")
-        # Институт
+
+        # 2. Институты
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS Institutes (
             InstituteID INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -77,6 +36,95 @@ def create_tables(conn):
             ShortName TEXT NOT NULL UNIQUE
         )""")
 
-        logger.info(f'Таблицы инициализированы')
+        # 3. Факультеты
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS Faculties (
+            FacultyID INTEGER PRIMARY KEY AUTOINCREMENT,
+            FacultyName TEXT NOT NULL UNIQUE,
+            ShortName TEXT NOT NULL UNIQUE,
+            InstituteID INTEGER NOT NULL,
+            FOREIGN KEY (InstituteID) REFERENCES Institutes(InstituteID)
+        )""")
+
+        # 4. Специализации
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS Specializations (
+            SpecializationID INTEGER PRIMARY KEY AUTOINCREMENT,
+            SpecializationName TEXT NOT NULL,
+            ShortName TEXT NOT NULL,
+            FacultyID INTEGER NOT NULL,
+            FOREIGN KEY (FacultyID) REFERENCES Faculties(FacultyID)
+        )""")
+
+        # 5. Группы
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS Groups (
+            GroupID INTEGER PRIMARY KEY AUTOINCREMENT,
+            GroupName TEXT NOT NULL UNIQUE,
+            SpecializationID INTEGER NOT NULL,
+            CourseNumber INTEGER NOT NULL CHECK (CourseNumber BETWEEN 1 AND 6),
+            LevelID INTEGER NOT NULL,
+            FOREIGN KEY (SpecializationID) REFERENCES Specializations(SpecializationID),
+            FOREIGN KEY (LevelID) REFERENCES EducationalLevel(LevelID)
+        )""")
+
+        # 6. Предметы
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS Subjects (
+            SubjectID INTEGER PRIMARY KEY AUTOINCREMENT,
+            SubjectName TEXT NOT NULL UNIQUE
+        )""")
+
+        # 7. Расписание
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS Schedule (
+            ScheduleID INTEGER PRIMARY KEY AUTOINCREMENT,
+            GroupID INTEGER NOT NULL,
+            Date TEXT NOT NULL,
+            Day TEXT NOT NULL,
+            Time TEXT NOT NULL,
+            SubjectID INTEGER NOT NULL,
+            FOREIGN KEY (GroupID) REFERENCES Groups(GroupID),
+            FOREIGN KEY (SubjectID) REFERENCES Subjects(SubjectID)
+        )""")
+
+        conn.commit()
+        logger.info('Таблицы созданы с обновленной структурой')
+
     except sqlite3.Error as e:
-        logger.error(f'Ошибка инициализации таблицы {str(e)}')
+        conn.rollback()
+        logger.error(f'Ошибка создания таблиц: {str(e)}')
+        raise
+
+
+def build_sql(conn, path_institutes: str, path_subjects: str, path_faculties: str, path_spec: str, path_excel: str):
+    if conn is not None:
+        try:
+            # Проверяем существование хотя бы одной таблицы
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT count(*) FROM sqlite_master 
+                WHERE type='table' AND name='Institutes'
+            """)
+            tables_exist = cursor.fetchone()[0] > 0
+
+            # Создаем таблицы только если их нет
+            if not tables_exist:
+                create_tables(conn)
+                add_institutes(conn, path_institutes)
+                add_subjects(conn, path_subjects)
+                add_faculties(conn, path_faculties)
+                add_specializations(conn, path_spec)
+                add_educational_levels(conn)
+                add_groups(conn, path_excel)
+                add_schedule(conn, path_excel)
+                logger.info("Таблицы успешно созданы")
+            else:
+                logger.info("Таблицы уже существуют")
+
+        except sqlite3.Error as e:
+            logger.error(f"Ошибка проверки таблиц: {e}")
+        finally:
+            conn.close()
+    else:
+        logger.error("Ошибка: не удалось подключиться к базе данных")

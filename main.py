@@ -5,9 +5,8 @@ import pandas as pd
 import sql
 import sqlite3
 
-
-LINK = "https://www.vyatsu.ru/studentu-1/spravochnaya-informatsiya/teacher.html"
-# LINK = 'https://www.vyatsu.ru/studentu-1/spravochnaya-informatsiya/raspisanie-zanyatiy-dlya-studentov.html'
+LINK_TEACHER = "https://www.vyatsu.ru/studentu-1/spravochnaya-informatsiya/teacher.html"
+LINK = 'https://www.vyatsu.ru/studentu-1/spravochnaya-informatsiya/raspisanie-zanyatiy-dlya-studentov.html'
 
 
 def get_unique_subjects_from_csvs(folder_path: str, output_file: str = 'subjects.txt') -> None:
@@ -46,39 +45,34 @@ def get_unique_subjects_from_csvs(folder_path: str, output_file: str = 'subjects
     print(f'Уникальные предметы сохранены в файл {output_file}')
 
 
-def main():
-    database = "proekt.db"
+PATH_SUBJECTS = 'info_for_db/subjects.txt'
+PATH_INST = 'info_for_db/institute.txt'
+PATH_FAC = 'info_for_db/faculties.txt'
+PATH_SPEC = 'info_for_db/spec.txt'
+PATH_EXCEL = 'data'
 
+
+def main():
+    database = "window_bot.db"
     conn = sql.create_connection(database)
 
     if conn is not None:
         # Создание таблиц
-        sql.create_tables(conn)
+        sql.build_sql(conn, path_subjects=PATH_SUBJECTS,
+                      path_institutes=PATH_INST,
+                      path_faculties=PATH_FAC,
+                      path_spec=PATH_SPEC,
+                      path_excel=PATH_EXCEL)
 
     '''groups = groups_web_parse(LINK)
     for group_data in groups:
         try:
             group = groups_pdf_parse(group_data)
-            file_name = f'data/{group_data['group']}.xlsx'
-            group.to_excel(file_name, index=False)
-            logger.info(f'Данные сохранены в {file_name}')
+            # file_name = f'data/{group_data['group']}.xlsx'
+            # group.to_excel(file_name, index=False)
+            # logger.info(f'Данные сохранены в {file_name}')
         except Exception as e:
             logger.info(f'Ошибка обработки {group_data['group']}\n{str(e)}')'''
-
-    '''teachers = teacher_web_parse(LINK)
-    for t in teachers:
-        teacher = teacher_excel_parse(link=t['link'],
-                                      departament=t['departament'],
-                                      faculty=t['faculty'])
-        file_name = f'data/{t['departament']}.xlsx'
-        logger.info(f'Сохранено {t['departament']}')
-        teacher.to_excel(file_name, index=False)'''
-
-    import_excel_subjects('data')
-    #with open('subjects.txt', 'r', encoding='utf-8') as file:
-    #    lines = [line.strip() for line in file if line.strip()]
-    sql.add_info.add_subjects(conn=conn,
-                              subject_names=lines)
 
 
 if __name__ == '__main__':

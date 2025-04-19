@@ -77,7 +77,6 @@ def parse_pdf_to_dataframe(pdf_content: bytes) -> pd.DataFrame:
                 if len(t) == 2:
                     current_day = t[0]
                     date = t[1].split('.')
-                    print(date)
                     current_date = f'20{date[2]}-{date[1]}-{date[0]}'
                 elif len(t) > 2:
                     for day in DAYS_OF_WEEK:
@@ -86,7 +85,6 @@ def parse_pdf_to_dataframe(pdf_content: bytes) -> pd.DataFrame:
                         m = re.search(DATE_PATTER, cells[0])
                         if m:
                             date = m.group(0).split('.')
-                            print(date)
                             current_date = f'20{date[2]}-{date[1]}-{date[0]}'
 
             # Проверка что найденно расписание или время
@@ -179,7 +177,7 @@ def parser_pdf(group_data: dict) -> DataFrame:
         if not group_match:
             raise ValueError(f"Неверный формат группы: {group_data['group']}")
         df = df[df['day'] != 'воскресенье']
-        df.insert(0, 'education_form', group_match.group('education_form'))
+        df.insert(0, 'course', group_match.group('course'))
         df.insert(0, 'institute', group_match.group('institute'))
         df.insert(0, 'education_level', group_match.group('education_level'))
         df.insert(0, 'specilizations', group_match.group('direction'))

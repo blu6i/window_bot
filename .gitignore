@@ -11,3 +11,5 @@ logs/
 trash/data/
 trash/
 *.xlsx
+info_for_db/
+data/
