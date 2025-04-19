@@ -13,3 +13,4 @@ trash/
 *.xlsx
 info_for_db/
 data/
+test_venv/
