@@ -324,7 +324,7 @@ def add_groups(conn, folder_path):
             """, (faculty, institute))
             faculty_id = cursor.fetchone()
             if not faculty_id:
-                print(f"Faculty '{faculty}' with institute '{institute}' not found.")
+                logger.warning(f"Факультет '{faculty}' с институтом '{institute}' не найден")
                 continue
             faculty_id = faculty_id[0]
 
@@ -336,7 +336,7 @@ def add_groups(conn, folder_path):
             """, (specialization, faculty_id))
             specialization_id = cursor.fetchone()
             if not specialization_id:
-                print(f"Specialization '{specialization}' for faculty '{faculty}' not found.")
+                logger.warning(f"Специальность '{specialization}' с факультета '{faculty}' не найден")
                 continue
             specialization_id = specialization_id[0]
 
@@ -348,7 +348,7 @@ def add_groups(conn, folder_path):
             """, (education_level,))
             level_id = cursor.fetchone()
             if not level_id:
-                print(f"Educational level '{education_level}' not found.")
+                logger.warning(f"Уровень образования '{education_level}' не найден")
                 continue
             level_id = level_id[0]
 
@@ -360,7 +360,7 @@ def add_groups(conn, folder_path):
             """, (group,))
             existing_group = cursor.fetchone()
             if existing_group:
-                print(f"Group '{group}' already exists.")
+                logger.warning(f"Группа '{group}' уже добавлена")
                 continue
 
             # Вставляем новую группу в таблицу Groups
@@ -371,15 +371,10 @@ def add_groups(conn, folder_path):
 
             # Сохраняем изменения в базе данных
             conn.commit()
-            print(f"Group '{group}' from file '{filename}' added successfully.")
+            print(f"Группа '{group}' из файла '{filename}' добавлена")
+
 
 # Добавление расписания
-import os
-import pandas as pd
-import sqlite3
-from utils import logger
-
-
 def add_schedule(conn, folder_path):
     """
     Добавляет расписание из всех Excel файлов в указанной папке в базу данных
