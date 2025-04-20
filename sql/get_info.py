@@ -26,9 +26,12 @@ def is_schedule_on_date(conn, date_str: str) -> bool:
     return cursor.fetchone() is not None
 
 
+'''
 def is_check_entity(conn, search_str: str) -> bool:
     """
     Проверяет, существует ли группа/факультет/институт/направление в бд
+    !!! Старая версия. В новой теперь проверяем возвращает ли поиск что-то, если возвращает, то это есть
+    в базе данных, а следовательно существует
     Args:
         conn: соединение с базой данных SQLite
         search_str: строка с данными
@@ -66,6 +69,41 @@ def is_check_entity(conn, search_str: str) -> bool:
         return True
 
     return False
+'''
+
+
+def get_groups(conn, name: str) -> list[str]:
+    """
+    Возвращает список названий групп, которые относятся к переданному названию
+    факультета, института или специальности.
+
+    Args:
+        conn: соединение с SQLite
+        name: строка (название факультета / института / специальности)
+    Returns:
+        список названий групп
+    """
+    cursor = conn.cursor()
+
+    query = """
+    SELECT G.GroupName
+    FROM Groups G
+    JOIN Specializations S ON G.SpecializationID = S.SpecializationID
+    JOIN Faculties F ON S.FacultyID = F.FacultyID
+    JOIN Institutes I ON F.InstituteID = I.InstituteID
+    WHERE S.SpecializationName = ?
+       OR S.ShortName = ?
+       OR F.FacultyName = ?
+       OR F.ShortName = ?
+       OR I.FullName = ?
+       OR I.ShortName = ?
+       OR G.GroupName = ?
+    """
+
+    cursor.execute(query, (name, name, name, name, name, name, name))
+    rows = cursor.fetchall()
+
+    return [row[0] for row in rows]
 
 
 def main():
@@ -73,8 +111,9 @@ def main():
         conn = sqlite3.connect("../window_bot.db")
         search = input()
         # result = is_check_entity(conn, search)
-        result = is_schedule_on_date(conn, search)
-        print(result)  # True или False
+        # result = is_schedule_on_date(conn, search)
+        result = get_groups(conn, search)
+        print(result)
 
 
 if __name__ == '__main__':
