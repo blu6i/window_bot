@@ -7,16 +7,13 @@ from utils import logger
 
 
 # Добавление предметов
-def add_subjects(conn, file_path):
+def add_subjects(conn, file_path: str):
     """
     Пакетное добавление предметов
-
-    Параметры:
+    Формат файла: название предмета
+    Args:
         conn: соединение с базой данных
-        subject_names: массив названий предметов
-
-    Возвращает:
-        Кортеж: (добавлено, дубликаты)
+        file_path: путь до файла
     """
     with open(file_path, 'r', encoding='utf-8') as file:
         subject_names = [line.strip() for line in file if line.strip()]
@@ -37,8 +34,7 @@ def add_subjects(conn, file_path):
         if not new_subjects:
             dup_count = len(subject_names)
             logger.info(f"Все {dup_count} предметов уже существуют")
-            return 0, subject_names
-
+            return
         # Пакетная вставка
         cursor.executemany(
             "INSERT INTO Subjects (SubjectName) VALUES (?)",
@@ -58,11 +54,14 @@ def add_subjects(conn, file_path):
 
 
 # Добавление факультета
-def add_faculties(conn, file_path):
+def add_faculties(conn, file_path: str):
     """
     Читает факультеты из файла и добавляет их в БД, связывая с существующими институтами.
-    Формат файла (каждая строка):
-    факультет;аббревиатура;название_института
+    Формат файла (каждая строка): факультет;аббревиатура;название_института
+
+    Args:
+        conn: соединение с базой данных
+        file_path: путь до файла с факультетами
     """
     try:
         # Чтение и подготовка данных
@@ -128,14 +127,15 @@ def add_faculties(conn, file_path):
 
 
 # Добавление институтов
-def add_institutes(conn, file_path):
+def add_institutes(conn, file_path: str):
     """
     Читает институты из файла и добавляет их в базу данных в том же порядке.
-    Формат файла: каждая строка содержит полное название и аббревиатуру через разделитель ';'
+    Формат файла: Институт;аббревиатура
 
-    Параметры:
-        conn: соединение с SQLite базой данных
-        file_path: путь к текстовому файлу
+
+    Args:
+        conn: соединение с базой данных
+        file_path: путь к файлу с институтами
     """
     try:
         # Чтение данных из файла
@@ -179,10 +179,13 @@ def add_institutes(conn, file_path):
 
 
 # Добавление специальностей
-def add_specializations(conn, file_path):
+def add_specializations(conn, file_path: str):
     """
-    Добавляет специальности из файла в базу данных
-    Формат файла: name;short_name;faculty_name
+    Добавляет дисциплину из файла в базу данных
+    Формат файла: Название дисциплины;аббревиатура;название факультета
+    Args:
+        conn: соединение с базой данных
+        file_path: путь до файла с дисциплинами
     """
     try:
         # Чтение данных из файла
@@ -208,7 +211,7 @@ def add_specializations(conn, file_path):
 
         # Получаем ID всех факультетов один раз
         cursor.execute("SELECT FacultyID, FacultyName FROM Faculties")
-        faculty_map = {name: id for id, name in cursor.fetchall()}
+        faculty_map = {name: id_ for id_, name in cursor.fetchall()}
 
         # Добавляем специальности
         added_count = 0
@@ -254,6 +257,9 @@ def add_educational_levels(conn):
     """
     Добавляет стандартные уровни образования в таблицу EducationalLevel.
     Уровни: Бакалавриат (Б), Специалитет (С), Магистратура (М), Аспирантура (А)
+
+    Args:
+        conn: соединение с базой данных
     """
     standard_levels = [
         ("Бакалавриат", "б"),
@@ -297,7 +303,14 @@ def add_educational_levels(conn):
 
 
 # Добавление групп
-def add_groups(conn, folder_path):
+def add_groups(conn, folder_path: str):
+    """
+    Добавляет группы из excel в таблицу sql
+    Формат: факультет, название группы, курс, уровень образования, институт
+    Args:
+        conn: соединение с базой данных
+        folder_path: путь до папки с excel файлами
+    """
     cursor = conn.cursor()
 
     # Проходим по всем файлам в папке
@@ -375,10 +388,13 @@ def add_groups(conn, folder_path):
 
 
 # Добавление расписания
-def add_schedule(conn, folder_path):
+def add_schedule(conn, folder_path: str):
     """
     Добавляет расписание из всех Excel файлов в указанной папке в базу данных
-    Формат Excel: group | date | day | time | subject
+    Формат Excel: группа | дата | день | время | предмет
+    Args:
+        conn: соединение с базой данных
+        folder_path: путь до папки с excel файлами
     """
     try:
         # Получаем список Excel файлов в папке
@@ -387,21 +403,16 @@ def add_schedule(conn, folder_path):
 
         if not excel_files:
             logger.warning(f"В папке {folder_path} не найдено Excel файлов")
-            return 0
 
         cursor = conn.cursor()
         cursor.execute("BEGIN TRANSACTION")
 
-        # Подготовка кэша для быстрого доступа
-        group_cache = {}
-        subject_cache = {}
-
         # Заполняем кэш существующими данными
         cursor.execute("SELECT GroupID, GroupName FROM Groups")
-        group_cache = {name: id for id, name in cursor.fetchall()}
+        group_cache = {name: id_ for id_, name in cursor.fetchall()}
 
         cursor.execute("SELECT SubjectID, SubjectName FROM Subjects")
-        subject_cache = {name: id for id, name in cursor.fetchall()}
+        subject_cache = {name: id_ for id_, name in cursor.fetchall()}
 
         total_added = 0
 
@@ -477,9 +488,7 @@ def add_schedule(conn, folder_path):
 
         conn.commit()
         logger.info(f"Всего добавлено {total_added} записей расписания из {len(excel_files)} файлов")
-        return total_added
 
     except Exception as e:
         conn.rollback()
         logger.error(f"Критическая ошибка: {str(e)}")
-        return 0

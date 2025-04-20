@@ -1,6 +1,8 @@
 import sqlite3
+
+from sql.add_info import (add_institutes, add_faculties, add_educational_levels, add_schedule,
+                          add_specializations, add_groups)
 from utils import logger
-from sql.add_info import *
 
 
 def create_connection(db_file):
@@ -97,34 +99,12 @@ def create_tables(conn):
         raise
 
 
-def build_sql(conn, path_institutes: str, path_subjects: str, path_faculties: str, path_spec: str, path_excel: str):
-    if conn is not None:
-        try:
-            # Проверяем существование хотя бы одной таблицы
-            cursor = conn.cursor()
-            cursor.execute("""
-                SELECT count(*) FROM sqlite_master 
-                WHERE type='table' AND name='Institutes'
-            """)
-            tables_exist = cursor.fetchone()[0] > 0
-
-            # Создаем таблицы только если их нет
-            if not tables_exist:
-                create_tables(conn)
-                add_institutes(conn, path_institutes)
-                add_subjects(conn, path_subjects)
-                add_faculties(conn, path_faculties)
-                add_specializations(conn, path_spec)
-                add_educational_levels(conn)
-                add_groups(conn, path_excel)
-                add_schedule(conn, path_excel)
-                logger.info("Таблицы успешно созданы")
-            else:
-                logger.info("Таблицы уже существуют")
-
-        except sqlite3.Error as e:
-            logger.error(f"Ошибка проверки таблиц: {e}")
-        finally:
-            conn.close()
-    else:
-        logger.error("Ошибка: не удалось подключиться к базе данных")
+def build_sql(conn, path_institutes: str, path_faculties: str, path_spec: str, path_excel: str):
+    create_tables(conn)
+    add_institutes(conn, path_institutes)
+    add_faculties(conn, path_faculties)
+    add_specializations(conn, path_spec)
+    add_educational_levels(conn)
+    add_groups(conn, path_excel)
+    add_schedule(conn, path_excel)
+    logger.info("Таблицы успешно созданы")
