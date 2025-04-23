@@ -11,11 +11,11 @@ def update_schedule():
     for group_data in groups:
         try:
             group = groups_pdf_parse(group_data)
-            file_name = f'data/{group_data['group']}.xlsx'
+            file_name = f'data/{group_data["group"]}.xlsx'
             group.to_excel(file_name, index=False)
             logger.info(f'Данные сохранены в {file_name}')
         except Exception as e:
-            logger.info(f'Ошибка обработки {group_data['group']}\n{str(e)}')
+            logger.info(f'Ошибка обработки {group_data["group"]}\n{str(e)}')
 
 
 PATH_SUBJECTS = 'info_for_db/subjects.txt'
@@ -31,7 +31,7 @@ def main():
 
     # Работа с БД
     try:
-        database = "window_bot.db"
+        database = "db/data-groups.db"
         conn = sql.create_connection(database)
         if conn is not None:
             # Создание таблиц

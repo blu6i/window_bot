@@ -4,21 +4,31 @@ from sql.add_info import (add_institutes, add_faculties, add_educational_levels,
                           add_specializations, add_groups)
 from utils import logger
 
+conn = None
+LINK_DB = 'db/data-groups.db'
 
-def create_connection(db_file):
+
+def create_connection():
     """Создание подключения к базе данных SQLite"""
-    conn = None
+    global conn
     try:
-        conn = sqlite3.connect(db_file)
-        logger.info(f"Подключено к {db_file}, версия SQLite: {sqlite3.version}")
+        conn = sqlite3.connect(LINK_DB)
+        logger.info(f"Подключено к {LINK_DB}, версия SQLite: {sqlite3.version}")
         return conn
     except sqlite3.Error as e:
         logger.error(f'Ошибка инициализации таблицы {str(e)}')
     return conn
 
 
+def get_connection_gr():
+    global conn
+    if conn is None:
+        conn = create_connection()
+    return conn
+
+
 def create_tables(conn):
-    """Создание всех таблиц с обновленной структурой"""
+    """Создание всех таблиц"""
     try:
         cursor = conn.cursor()
 

@@ -1,10 +1,10 @@
 venv/
+.venv/
 .env
 __pycache__/
 *.pyc
 *.csv
 *.pdf
-.venv/
 .idea/
 old_version/
 logs/

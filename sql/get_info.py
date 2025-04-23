@@ -1,11 +1,13 @@
 import sqlite3
 import re
 from datetime import datetime
+from sql.init_sql import get_connection_gr
 
 PATTERN_GROUP = r"^[а-яА-ЯёЁ]+-\d{4}-\d{2}-\d{2}$"
 
+conn = get_connection_gr()
 
-def is_schedule_on_date(conn, date_str: str) -> bool:
+def is_schedule_on_date(date_str: str) -> bool:
     """
     Проверяет, существует ли расписание хотя бы для одной группы на указанную дату.
     Принимает дату в формате 'DD.MM.YYYY' и преобразует её к 'YYYY-MM-DD'.
@@ -26,8 +28,7 @@ def is_schedule_on_date(conn, date_str: str) -> bool:
     return cursor.fetchone() is not None
 
 
-'''
-def is_check_entity(conn, search_str: str) -> bool:
+def is_check_entity(search_str: str) -> bool:
     """
     Проверяет, существует ли группа/факультет/институт/направление в бд
     !!! Старая версия. В новой теперь проверяем возвращает ли поиск что-то, если возвращает, то это есть
@@ -69,10 +70,9 @@ def is_check_entity(conn, search_str: str) -> bool:
         return True
 
     return False
-'''
 
 
-def get_groups(conn, name: str) -> list[str]:
+def get_groups(name: str) -> list[str]:
     """
     Возвращает список названий групп, которые относятся к переданному названию
     факультета, института или специальности.

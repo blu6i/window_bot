@@ -56,7 +56,6 @@ def get_set_free_time(free_slots: dict) -> set:
     common_slots = set(free_slots[group_names[0]])
     # Если указана только одна группа
     if len(group_names) == 1:
-        print('++')
         return common_slots
     # Поочередно пересекаем с остальными
     for group in group_names[1:]:
