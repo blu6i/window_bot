@@ -14,6 +14,8 @@ from webdriver_manager.chrome import ChromeDriverManager
 
 from utils import logger
 
+from parser.student.pdf_parser import parser_pdf
+
 LINK = "https://www.vyatsu.ru/studentu-1/spravochnaya-informatsiya/raspisanie-zanyatiy-dlya-studentov.html"
 
 FACULTIES = {
@@ -200,7 +202,8 @@ def parse_schedule(link: str) -> list[dict[str, Any] | None]:
                                                     faculty=fak_name,
                                                     schedule_url=url)
                             logger.info(f'У группы {group_list[i].text} найдено расписание за {year}')
-                            groups.append(form)
+                            parser_pdf(form)
+                            # groups.append(form)
         logger.info('Парсинг сайта завершено успешно')
         return groups
     except Exception as e:
