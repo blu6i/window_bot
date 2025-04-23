@@ -22,7 +22,7 @@ WELCOME_TEXT = '''
 # Команда /start
 @dp.message_handler(commands=['start'], state="*")
 async def cmd_start(message: types.Message):
-    await message.answer(WELCOME_TEXT, reply_markup=get_main_menu(), parse_mode='HTML')
+    await message.answer(WELCOME_TEXT, reply_markup=get_main_menu(message.from_user.id), parse_mode='HTML')
 
 
 # Регистрируем все хендлеры

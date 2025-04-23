@@ -1,7 +1,14 @@
+import os
+
 from aiogram.types import KeyboardButton, ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKeyboardButton
+from dotenv import load_dotenv
+
+load_dotenv('config/.env')
+TOKEN = os.getenv('ADMIN_ID')
 
 
-def get_main_menu():
+def get_main_menu(u_id: int):
+    print(u_id, TOKEN)
     """ Выводит основное меню """
     keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
 
@@ -11,6 +18,9 @@ def get_main_menu():
         ['ℹ️ Помощь'],
         ['🔗 Ссылки быстрого доступа']
     ]
+    if u_id == int(TOKEN):
+        print('+')
+        buttons.append(['🔄 Обновить расписание'])
     for row in buttons:
         keyboard.row(*[KeyboardButton(btn) for btn in row])
 
