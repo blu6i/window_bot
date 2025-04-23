@@ -1,5 +1,6 @@
 from aiogram import types, Dispatcher
 from bot.keyboards import get_main_menu, get_menu_link
+from parser import groups_web_parse
 
 HELP_TEXT = """    
 <b>Основные функции:</b>
@@ -36,12 +37,23 @@ HELP_TEXT = """
 Аналогично с добавлением, только вместо "+" следует писать "-"
 """
 
+LINK_SHEDULE = 'https://www.vyatsu.ru/studentu-1/spravochnaya-informatsiya/raspisanie-zanyatiy-dlya-studentov.html'
 
 async def send_help(message: types.Message):
     """ Обработка ввода команды /help """
-    await message.answer(HELP_TEXT, reply_markup=get_main_menu(), parse_mode='HTML')
+    await message.answer(HELP_TEXT, reply_markup=get_main_menu(message.from_user.id), parse_mode='HTML')
+
+
+async def update_db(message: types.Message):
+    await message.answer('⏳ Запуск парсинга...')
+    try:
+        await message.answer('Я работаю')
+        #groups_web_parse(LINK_SHEDULE)
+    except Exception as e:
+        await message.answer(f'{e}')
 
 
 def register_main_handlers(dp: Dispatcher):
     dp.register_message_handler(send_help, commands=["help"], state='*')
     dp.register_message_handler(send_help, text='ℹ️ Помощь', state='*')
+    dp.register_message_handler(update_db, text='🔄 Обновить расписание', state='*')

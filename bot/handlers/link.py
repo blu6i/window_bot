@@ -45,9 +45,10 @@ async def back_to_main(event, state: FSMContext):
     """Вернуться в главное меню (универсально для сообщения и callback)"""
     await state.finish()
     if isinstance(event, types.CallbackQuery):
-        await event.message.answer("🔙 Возврат в главное меню", reply_markup=get_main_menu())
+        await event.message.answer("🔙 Возврат в главное меню", reply_markup=get_main_menu(event.from_user.id))
     else:
-        await event.answer("🔙 Возврат в главное меню", reply_markup=get_main_menu())
+        await event.answer("🔙 Возврат в главное меню", reply_markup=get_main_menu(event.from_user.id))
+
 
 def register_link_handlers(dp: Dispatcher):
     dp.register_message_handler(show_links, text="🔗 Ссылки быстрого доступа", state="*")
