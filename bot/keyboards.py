@@ -8,7 +8,6 @@ TOKEN = os.getenv('ADMIN_ID')
 
 
 def get_main_menu(u_id: int):
-    print(u_id, TOKEN)
     """ Выводит основное меню """
     keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
 
@@ -19,7 +18,6 @@ def get_main_menu(u_id: int):
         ['🔗 Ссылки быстрого доступа']
     ]
     if u_id == int(TOKEN):
-        print('+')
         buttons.append(['🔄 Обновить расписание'])
     for row in buttons:
         keyboard.row(*[KeyboardButton(btn) for btn in row])

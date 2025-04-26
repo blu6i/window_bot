@@ -1,6 +1,8 @@
 from aiogram import types, Dispatcher
 from bot.keyboards import get_main_menu, get_menu_link
 from parser import groups_web_parse
+from sql import build_sql
+LINK = 'https://www.vyatsu.ru/studentu-1/spravochnaya-informatsiya/raspisanie-zanyatiy-dlya-studentov.html'
 
 HELP_TEXT = """    
 <b>Основные функции:</b>
@@ -48,7 +50,10 @@ async def update_db(message: types.Message):
     await message.answer('⏳ Запуск парсинга...')
     try:
         await message.answer('Я работаю')
-        #groups_web_parse(LINK_SHEDULE)
+        build_sql()
+        groups_web_parse(LINK)
+
+
     except Exception as e:
         await message.answer(f'{e}')
 

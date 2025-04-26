@@ -9,6 +9,8 @@ from pandas import DataFrame
 from parser.utils.formating_str import format_class
 from utils import logger
 
+from sql import add_groups, add_schedule, get_connection_gr, create_connection, build_sql
+
 DAYS_OF_WEEK = ['понедельник', 'вторник', 'среда', 'четверг', 'пятница', 'суббота', 'воскресенье']
 FIRST_CLASS_TIME = "08:20-09:50"
 TIME_PATTERN = re.compile(r'\d{2}:\d{2}-\d{2}:\d{2}')
@@ -183,7 +185,8 @@ def parser_pdf(group_data: dict) -> DataFrame:
         df.insert(0, 'specilizations', group_match.group('direction'))
         df.insert(0, 'group', group_data['group'])
         df.insert(0, 'faculty', group_data['faculty'])
-
+        add_groups(df)
+        add_schedule(df)
         return df
 
     except requests.RequestException as e:
@@ -197,13 +200,16 @@ def parser_pdf(group_data: dict) -> DataFrame:
 def main():
     # Пример использования
     group_data = {
-        'group': 'ПОДб-1701-08-00',
-        'faculty': 'Пед',
-        'schedule_url': 'https://www.vyatsu.ru/reports/schedule/Group/24094_2_31032025_13042025.pdf'
+        'group': 'ИВТб-1303-05-00',
+        'faculty': 'ФАВТ',
+        'schedule_url': 'https://www.vyatsu.ru/reports/schedule/Group/24257_2_14042025_27042025.pdf'
     }
+    # conn = create_connection()
+    # cursor = conn.cursor()
     try:
+        build_sql()
         filename = parser_pdf(group_data)
-        filename.to_excel('fall.xlsx', index=False)
+        # filename.to_excel('fall.xlsx', index=False)
     except Exception as e:
         logger.info(f"Ошибка: {str(e)}")
 

@@ -12,6 +12,7 @@ TOKEN = os.getenv('BOT_TOKEN')
 bot = Bot(token=TOKEN)
 storage = MemoryStorage()
 dp = Dispatcher(bot, storage=storage)
+
 WELCOME_TEXT = '''   
 Добро пожаловать в бота для нахождения свободных окон в расписании
 
@@ -34,5 +35,4 @@ register_main_handlers(dp)
 # Запуск
 if __name__ == "__main__":
     init_db()
-    create_connection()
     executor.start_polling(dp, skip_updates=True)

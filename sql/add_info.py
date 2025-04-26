@@ -5,6 +5,8 @@ import pandas as pd
 
 from utils import logger
 
+from sql.init_connection import get_connection_gr
+
 
 # Добавление предметов
 def add_subjects(conn, file_path: str):
@@ -303,7 +305,91 @@ def add_educational_levels(conn):
 
 
 # Добавление групп
-def add_groups(conn, folder_path: str):
+def add_groups(df: pd.DataFrame):
+    """
+    Добавляет группу из второй строки DataFrame (аналогично чтению второй строки из Excel)
+    Формат строки: факультет, название группы, специальность, уровень образования, институт, курс
+    Args:
+        conn: соединение с базой данных
+        df: DataFrame, содержащий хотя бы 2 строки
+        filename: имя "файла" — только для логов
+    """
+    conn = get_connection_gr()
+    cursor = conn.cursor()
+
+    if df.shape[0] < 2:
+        logger.warning(f"DataFrame содержит меньше двух строк — нечего читать")
+        return
+
+    try:
+        # Извлекаем данные из второй строки
+        faculty = df.iloc[0, 0]  # Столбец "faculty"
+        group = df.iloc[0, 1]  # Столбец "group"
+        specialization = df.iloc[0, 2]  # Столбец "specilizations"
+        education_level = df.iloc[0, 3]  # Столбец "education_level"
+        institute = int(df.iloc[0, 4])  # Столбец "institute"
+        course = int(df.iloc[0, 5])  # Столбец "course"
+    except Exception as e:
+        logger.warning(f"Ошибка при чтении строки: {e}")
+        return
+
+    # Получаем FacultyID
+    cursor.execute("""
+        SELECT FacultyID 
+        FROM Faculties 
+        WHERE ShortName = ? AND InstituteID = ?
+    """, (faculty, institute))
+    faculty_id = cursor.fetchone()
+    if not faculty_id:
+        logger.warning(f"Факультет '{faculty}' с институтом '{institute}' не найден")
+        return
+    faculty_id = faculty_id[0]
+
+    # Получаем SpecializationID
+    cursor.execute("""
+        SELECT SpecializationID 
+        FROM Specializations 
+        WHERE ShortName = ? AND FacultyID = ?
+    """, (specialization, faculty_id))
+    specialization_id = cursor.fetchone()
+    if not specialization_id:
+        logger.warning(f"Специальность '{specialization}' не найдена")
+        return
+    specialization_id = specialization_id[0]
+
+    # Получаем LevelID
+    cursor.execute("""
+        SELECT LevelID 
+        FROM EducationalLevel 
+        WHERE ShortName = ?
+    """, (education_level,))
+    level_id = cursor.fetchone()
+    if not level_id:
+        logger.warning(f"Уровень образования '{education_level}' не найден")
+        return
+    level_id = level_id[0]
+
+    # Проверяем, существует ли группа
+    cursor.execute("""
+        SELECT GroupID 
+        FROM Groups 
+        WHERE GroupName = ?
+    """, (group,))
+    existing_group = cursor.fetchone()
+    if existing_group:
+        logger.warning(f"Группа '{group}' уже добавлена")
+        return
+
+    # Вставляем новую группу
+    cursor.execute("""
+        INSERT INTO Groups (GroupName, SpecializationID, CourseNumber, LevelID) 
+        VALUES (?, ?, ?, ?)
+    """, (group, specialization_id, course, level_id))
+
+    conn.commit()
+    logger.info(f"Группа '{group}' успешно добавлена")
+
+'''def add_groups(conn, folder_path: str):
     """
     Добавляет группы из excel в таблицу sql
     Формат: факультет, название группы, курс, уровень образования, институт
@@ -384,111 +470,83 @@ def add_groups(conn, folder_path: str):
 
             # Сохраняем изменения в базе данных
             conn.commit()
-            print(f"Группа '{group}' из файла '{filename}' добавлена")
+            print(f"Группа '{group}' из файла '{filename}' добавлена")'''
 
 
 # Добавление расписания
-def add_schedule(conn, folder_path: str):
+def add_schedule(df: pd.DataFrame):
     """
-    Добавляет расписание из всех Excel файлов в указанной папке в базу данных
-    Формат Excel: группа | дата | день | время | предмет
+    Добавляет расписание на основе DataFrame.
+    Старые записи НЕ удаляются — предполагается, что это делается отдельно.
+
     Args:
-        conn: соединение с базой данных
-        folder_path: путь до папки с excel файлами
+        df: DataFrame с данными
     """
+    conn = get_connection_gr()
     try:
-        # Получаем список Excel файлов в папке
-        excel_files = [f for f in os.listdir(folder_path)
-                       if f.endswith(('.xlsx', '.xls'))]
-
-        if not excel_files:
-            logger.warning(f"В папке {folder_path} не найдено Excel файлов")
-
         cursor = conn.cursor()
         cursor.execute("BEGIN TRANSACTION")
 
-        # Заполняем кэш существующими данными
+        # Кэш групп
         cursor.execute("SELECT GroupID, GroupName FROM Groups")
         group_cache = {name: id_ for id_, name in cursor.fetchall()}
 
+        # Кэш предметов
         cursor.execute("SELECT SubjectID, SubjectName FROM Subjects")
         subject_cache = {name: id_ for id_, name in cursor.fetchall()}
 
-        total_added = 0
+        required_columns = ['group', 'date', 'day', 'time', 'subject']
+        if not all(col in df.columns for col in required_columns):
+            missing = set(required_columns) - set(df.columns)
+            logger.warning(f"Отсутствуют колонки: {missing}")
+            return
 
-        for file_name in excel_files:
-            file_path = os.path.join(folder_path, file_name)
-            try:
-                # Чтение Excel файла
-                df = pd.read_excel(file_path)
-                required_columns = ['group', 'date', 'day', 'time', 'subject']
+        schedule_data = df[required_columns].dropna().drop_duplicates()
+        added_count = 0
 
-                # Проверка наличия всех необходимых колонок
-                if not all(col in df.columns for col in required_columns):
-                    missing = set(required_columns) - set(df.columns)
-                    logger.warning(f"В файле {file_name} отсутствуют колонки: {missing}")
-                    continue
+        for _, row in schedule_data.iterrows():
+            group_name = str(row['group']).strip()
+            subject_name = str(row['subject']).strip()
+            if not subject_name:
+                continue
+            date = str(row['date']).strip()
+            day = str(row['day']).strip()
+            time = str(row['time']).strip()
 
-                # Обработка данных
-                schedule_data = df[required_columns].dropna().drop_duplicates()
-                added_in_file = 0
-
-                for _, row in schedule_data.iterrows():
-                    group_name = str(row['group']).strip()
-                    subject_name = str(row['subject']).strip()
-                    date = str(row['date']).strip()
-                    day = str(row['day']).strip()
-                    time = str(row['time']).strip()
-
-                    # Получаем GroupID
-                    if group_name not in group_cache:
-                        logger.warning(f"Группа {group_name} не найдена (файл: {file_name})")
-                        continue
-                    group_id = group_cache[group_name]
-
-                    # Получаем SubjectID (добавляем если не существует)
-                    if subject_name not in subject_cache:
-                        try:
-                            cursor.execute(
-                                "INSERT INTO Subjects (SubjectName) VALUES (?)",
-                                (subject_name,)
-                            )
-                            subject_id = cursor.lastrowid
-                            subject_cache[subject_name] = subject_id
-                        except sqlite3.IntegrityError:
-                            # На случай параллельного добавления
-                            cursor.execute(
-                                "SELECT SubjectID FROM Subjects WHERE SubjectName = ?",
-                                (subject_name,)
-                            )
-                            subject_id = cursor.fetchone()[0]
-                            subject_cache[subject_name] = subject_id
-
-                    subject_id = subject_cache[subject_name]
-
-                    # Добавляем запись в расписание
-                    try:
-                        cursor.execute(
-                            """INSERT INTO Schedule 
-                            (GroupID, Date, Day, Time, SubjectID) 
-                            VALUES (?, ?, ?, ?, ?)""",
-                            (group_id, date, day, time, subject_id)
-                        )
-                        added_in_file += 1
-                    except sqlite3.IntegrityError:
-                        # Пропускаем дубликаты расписания
-                        continue
-
-                total_added += added_in_file
-                logger.info(f"Файл {file_name}: добавлено {added_in_file} записей")
-
-            except Exception as e:
-                logger.error(f"Ошибка обработки файла {file_name}: {str(e)}")
+            group_id = group_cache.get(group_name)
+            if not group_id:
+                logger.warning(f"Группа '{group_name}' не найдена")
                 continue
 
+            subject_id = subject_cache.get(subject_name)
+            if not subject_id:
+                try:
+                    cursor.execute(
+                        "INSERT INTO Subjects (SubjectName) VALUES (?)",
+                        (subject_name,)
+                    )
+                    subject_id = cursor.lastrowid
+                    subject_cache[subject_name] = subject_id
+                except sqlite3.IntegrityError:
+                    cursor.execute(
+                        "SELECT SubjectID FROM Subjects WHERE SubjectName = ?",
+                        (subject_name,)
+                    )
+                    subject_id = cursor.fetchone()[0]
+                    subject_cache[subject_name] = subject_id
+
+            cursor.execute("""
+                INSERT INTO Schedule (GroupID, Date, Day, Time, SubjectID)
+                VALUES (?, ?, ?, ?, ?)
+            """, (group_id, date, day, time, subject_id))
+            added_count += 1
+
         conn.commit()
-        logger.info(f"Всего добавлено {total_added} записей расписания из {len(excel_files)} файлов")
+        logger.info(f"Добавлено {added_count} записей в расписание")
 
     except Exception as e:
         conn.rollback()
-        logger.error(f"Критическая ошибка: {str(e)}")
+        logger.error(f"Ошибка при добавлении расписания: {str(e)}")
+
+
+

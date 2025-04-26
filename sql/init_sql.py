@@ -1,34 +1,44 @@
 import sqlite3
 
-from sql.add_info import (add_institutes, add_faculties, add_educational_levels, add_schedule,
-                          add_specializations, add_groups)
+from sql.add_info import (add_institutes, add_faculties, add_educational_levels,
+                          add_specializations)
 from utils import logger
 
-conn = None
-LINK_DB = 'db/data-groups.db'
+from sql.init_connection import get_connection_gr
+
+#_conn = None
+#LINK_DB = 'db/data-groups.db'
+
+PATH_SUBJECTS = '../../info_for_db/subjects.txt'
+PATH_INST = '../../info_for_db/institute.txt'
+PATH_FAC = '../../info_for_db/faculties.txt'
+PATH_SPEC = '../../info_for_db/spec.txt'
 
 
-def create_connection():
+'''def create_connection():
     """Создание подключения к базе данных SQLite"""
-    global conn
+    global _conn
     try:
-        conn = sqlite3.connect(LINK_DB)
+        _conn = sqlite3.connect(LINK_DB)
         logger.info(f"Подключено к {LINK_DB}, версия SQLite: {sqlite3.version}")
-        return conn
     except sqlite3.Error as e:
         logger.error(f'Ошибка инициализации таблицы {str(e)}')
-    return conn
 
 
 def get_connection_gr():
-    global conn
-    if conn is None:
-        conn = create_connection()
-    return conn
+    global _conn
+    if _conn is None:
+        try:
+            _conn = sqlite3.connect(LINK_DB)
+            logger.info(f"Подключено к {LINK_DB}, версия SQLite: {sqlite3.version}")
+        except sqlite3.Error as e:
+            logger.error(f'Ошибка инициализации таблицы {str(e)}')
+    return _conn'''
 
 
-def create_tables(conn):
+def create_tables():
     """Создание всех таблиц"""
+    conn = get_connection_gr()
     try:
         cursor = conn.cursor()
 
@@ -109,12 +119,15 @@ def create_tables(conn):
         raise
 
 
-def build_sql(conn, path_institutes: str, path_faculties: str, path_spec: str, path_excel: str):
-    create_tables(conn)
-    add_institutes(conn, path_institutes)
-    add_faculties(conn, path_faculties)
-    add_specializations(conn, path_spec)
+def build_sql():
+    conn = get_connection_gr()
+    cursor = conn.cursor()
+    create_tables()
+    cursor.execute("DELETE FROM Schedule")
+    conn.commit()
+    logger.info("Таблица Schedule очищена")
+    add_institutes(conn, PATH_INST)
+    add_faculties(conn, PATH_FAC)
+    add_specializations(conn, PATH_SPEC)
     add_educational_levels(conn)
-    add_groups(conn, path_excel)
-    add_schedule(conn, path_excel)
     logger.info("Таблицы успешно созданы")
