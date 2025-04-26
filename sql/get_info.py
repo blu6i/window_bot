@@ -1,22 +1,24 @@
 import sqlite3
+
 import re
 from datetime import datetime
-from sql.init_sql import get_connection_gr
+
+from sql.init_connection import get_connection
 
 PATTERN_GROUP = r"^[а-яА-ЯёЁ]+-\d{4}-\d{2}-\d{2}$"
 
-conn = get_connection_gr()
 
+# Проверка, что дата есть в БД
 def is_schedule_on_date(date_str: str) -> bool:
     """
     Проверяет, существует ли расписание хотя бы для одной группы на указанную дату.
     Принимает дату в формате 'DD.MM.YYYY' и преобразует её к 'YYYY-MM-DD'.
     Args:
-        conn: соединение с базой данных SQLite
         date_str: дата в формате 'DD.MM.YYYY'
     Returns:
         True если расписание есть, иначе False
     """
+    conn = get_connection()
     try:
         # Преобразуем в формат YYYY-MM-DD
         parsed_date = datetime.strptime(date_str, "%d.%m.%Y").strftime("%Y-%m-%d")
@@ -28,17 +30,18 @@ def is_schedule_on_date(date_str: str) -> bool:
     return cursor.fetchone() is not None
 
 
+# Проверка, что элемент есть в БД
 def is_check_entity(search_str: str) -> bool:
     """
     Проверяет, существует ли группа/факультет/институт/направление в бд
     !!! Старая версия. В новой теперь проверяем возвращает ли поиск что-то, если возвращает, то это есть
     в базе данных, а следовательно существует
     Args:
-        conn: соединение с базой данных SQLite
         search_str: строка с данными
     Returns:
         True если данные есть, иначе False
     """
+    conn = get_connection()
     cursor = conn.cursor()
     # Проверка формата группы
     if re.match(PATTERN_GROUP, search_str):
@@ -72,17 +75,18 @@ def is_check_entity(search_str: str) -> bool:
     return False
 
 
+# Получение групп из таблицы с расписанием
 def get_groups(name: str) -> list[str]:
     """
     Возвращает список названий групп, которые относятся к переданному названию
     факультета, института или специальности.
 
     Args:
-        conn: соединение с SQLite
         name: строка (название факультета / института / специальности)
     Returns:
         список названий групп
     """
+    conn = get_connection()
     cursor = conn.cursor()
 
     query = """
@@ -106,13 +110,50 @@ def get_groups(name: str) -> list[str]:
     return [row[0] for row in rows]
 
 
+# Получение списка групп пользователя
+def get_user_groups(user_id: int) -> list[str]:
+    """Получить список названий групп пользователя"""
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT g.GroupName
+        FROM user_groups ug
+        JOIN Groups g ON ug.group_id = g.GroupID
+        WHERE ug.user_id = ?
+    """, (user_id,))
+    return [row[0] for row in cursor.fetchall()]
+
+
+# Получение списка дат пользователя
+def get_user_dates(user_id: int) -> list[str]:
+    """Получить список дат пользователя"""
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute(
+        "SELECT date FROM user_dates WHERE user_id = ?",
+        (user_id,)
+    )
+    return [row[0] for row in cursor.fetchall()]
+
+
+# Проверка наличия даты в расписании
+def is_date_in_schedule(date_str: str) -> bool:
+    """Проверка наличия даты в расписании"""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT 1 FROM Schedule WHERE Date = ? LIMIT 1", (date_str,))
+    result = cursor.fetchone()
+    return result is not None
+
+
 def main():
     for i in range(3):
-        conn = sqlite3.connect("../window_bot.db")
         search = input()
         # result = is_check_entity(conn, search)
         # result = is_schedule_on_date(conn, search)
-        result = get_groups(conn, search)
+        result = get_groups(search)
         print(result)
 
 

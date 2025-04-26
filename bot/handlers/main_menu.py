@@ -1,14 +1,16 @@
 from aiogram import types, Dispatcher
-from bot.keyboards import get_main_menu, get_menu_link
+
+from bot.keyboards import get_main_menu
 from parser import groups_web_parse
-from sql import build_sql
+from sql import build_sql, remove_schedule
+
 LINK = 'https://www.vyatsu.ru/studentu-1/spravochnaya-informatsiya/raspisanie-zanyatiy-dlya-studentov.html'
 
 HELP_TEXT = """    
 <b>Основные функции:</b>
 🪟 <b>Окна в расписании</b> - поиск свободного времени
-👥 <b>Мои группы</b> - управление вашими группами
-
+👥 <b>Изменить группы</b> - управление списком группами
+📅 <b>Изменить группы</b> - управление списком дат
 <b>Ссылки быстрого доступа:</b>
 📅 Расписание - официальный бот ВятГУ с расписанием
 📝 Отметка - система посещений
@@ -37,9 +39,22 @@ HELP_TEXT = """
 
 <b>Как удалить группу?</b>
 Аналогично с добавлением, только вместо "+" следует писать "-"
+
+<b>Как добавить дату?</b>
+1. Перейти в нужный раздел
+2. Ввести соответствующую команду:
+- Для добавления группы
+Напишите: <code>+Дата**</code>
+Например: <code>+21.04</code>
+
+<i>** - Формат даты: DD, DD.\u200BMM или DD.MM.YYYY</i>
+
+<b>Как удалить дату?</b>
+Аналогично с добавлением, только вместо "+" следует писать "-"
 """
 
 LINK_SHEDULE = 'https://www.vyatsu.ru/studentu-1/spravochnaya-informatsiya/raspisanie-zanyatiy-dlya-studentov.html'
+
 
 async def send_help(message: types.Message):
     """ Обработка ввода команды /help """
@@ -49,13 +64,11 @@ async def send_help(message: types.Message):
 async def update_db(message: types.Message):
     await message.answer('⏳ Запуск парсинга...')
     try:
-        await message.answer('Я работаю')
-        build_sql()
+        remove_schedule()
         groups_web_parse(LINK)
-
-
+        await message.answer(f'✅ Парсинг завершен')
     except Exception as e:
-        await message.answer(f'{e}')
+        await message.answer(f'⚠️ Ошибка при парсинге\n{e}')
 
 
 def register_main_handlers(dp: Dispatcher):

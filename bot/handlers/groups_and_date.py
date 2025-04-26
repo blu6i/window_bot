@@ -5,282 +5,300 @@ from aiogram.dispatcher import FSMContext
 
 from bot.keyboards import get_inline_key_list
 from bot.states import MenuStates
-from sql import get_user_values, add_value, remove_value, is_check_entity, get_groups
+from sql import add_user_date, add_user_group, get_user_groups, get_user_dates, get_groups, is_check_entity, \
+    remove_user_group, remove_user_date, remove_all_user_dates, remove_all_user_groups, is_date_in_schedule
 
 
 async def show_groups(message: types.Message, state: FSMContext):
-    """Вывод групп"""
+    """Вывод групп пользователя"""
     user_id = message.from_user.id
-    # Получение групп из бд юзера
-    groups = get_user_values(user_id, "group")
-    # Удаляем предыдущее сообщение
+    groups = get_user_groups(user_id)
+
+    # Удаляем старое сообщение
     data = await state.get_data()
-    last_msg_id = data.get("last_dates_msg")
+    last_msg_id = data.get("last_groups_msg")
     if last_msg_id:
-        try:
-            await message.bot.edit_message_reply_markup(chat_id=message.chat.id,
-                                                        message_id=last_msg_id,
-                                                        reply_markup=None)
-        except:
-            pass
-    # Проверка что список не пуст
+        await safe_remove_keyboard(message.bot, message.chat.id, last_msg_id)
+
     if not groups:
         sent = await message.answer("👥 У вас пока нет добавленных групп.")
     else:
-        sent = await message.answer("👥 Ваши группы:",
-                                    reply_markup=get_inline_key_list(groups, "group"))
-    # Сохраняем ласт сообщение
+        sent = await message.answer("👥 Ваши группы:", reply_markup=get_inline_key_list(groups, "group"))
+
     await state.update_data(last_groups_msg=sent.message_id)
     await state.set_state(MenuStates.GROUP_EDIT.state)
 
 
 async def add_group(message: types.Message, state: FSMContext):
-    """Обработка добавления группы"""
+    """Добавление новой группы"""
     group = message.text[1:].strip()
     if not group:
         return
+
     user_id = message.from_user.id
-    # Получаем группы из бд
-    current_groups = get_user_values(user_id, "group")
-    # Проверка на дубликаты
+    current_groups = get_user_groups(user_id)
+
     if group in current_groups:
         await message.answer(f"⚠️ Группа «{group}» уже добавлена.")
         return
+
     if not is_check_entity(group):
-        await message.answer(f"⚠️ Неверно указана информация или её нет в базе")
+        await message.answer(f"⚠️ Неверно указана информация или её нет в базе.")
         return
+
     groups = get_groups(group)
     list_group = []
     for g in groups:
-        # Запись в бд
-        add_value(user_id, "group", g)
+        add_user_group(user_id, g)
         list_group.append(g)
+
     res = '\n'.join(list_group)
-    await message.answer(f"✅ Список пополнен\n: {res}")
-    # Удаляем предыдущее сообщение
-    data = await state.get_data()
-    last_msg_id = data.get("last_groups_msg")
-    if last_msg_id:
-        try:
-            await message.bot.edit_message_reply_markup(chat_id=message.chat.id,
-                                                        message_id=last_msg_id,
-                                                        reply_markup=None)
-        except:
-            pass
-    # Обновляем сообщение и отправляем
-    updated_groups = get_user_values(user_id, "group")
-    sent = await message.answer("👥 Ваши группы:",
-                                reply_markup=get_inline_key_list(updated_groups, "group"))
-    await state.update_data(last_groups_msg=sent.message_id)
+    await message.answer(f"✅ Список пополнен:\n{res}")
+
+    await refresh_groups_message(message, state, user_id)
 
 
 async def remove_group(message: types.Message, state: FSMContext):
-    """Обработка удаления группы"""
+    """Удаление группы"""
     group = message.text[1:].strip()
     if not group:
         return
+
     user_id = message.from_user.id
-    current_groups = get_user_values(user_id, "group")
-    # Проверка группы в списке
+    current_groups = get_user_groups(user_id)
+
     if group not in current_groups:
         await message.answer(f"⚠️ Группа «{group}» не найдена в списке.")
         return
-    # Удаляем из бд
-    remove_value(user_id, "group", group)
+
+    remove_user_group(user_id, group)
     await message.answer(f"❌ Группа «{group}» удалена.")
-    # Удаляем предыдущее сообщение
-    data = await state.get_data()
-    last_msg_id = data.get("last_groups_msg")
-    if last_msg_id:
-        try:
-            await message.bot.edit_message_reply_markup(chat_id=message.chat.id,
-                                                        message_id=last_msg_id,
-                                                        reply_markup=None)
-        except:
-            pass
-    # Выводим сообщение с новой информацией
-    updated_groups = get_user_values(user_id, "group")
-    if not updated_groups:
-        sent = await message.answer("👥 У вас пока нет добавленных групп.")
-    else:
-        sent = await message.answer("👥 Ваши группы:",
-                                    reply_markup=get_inline_key_list(updated_groups, "group"))
-    await state.update_data(last_groups_msg=sent.message_id)
+
+    await refresh_groups_message(message, state, user_id)
 
 
 async def group_callback(call: types.CallbackQuery, state: FSMContext):
-    """Обработка инлайн кнопки для группы"""
+    """Инлайн-кнопки для групп"""
     user_id = call.from_user.id
     data = call.data
-    # Удаление группы
+
+    groups = get_user_groups(user_id)
+    state_data = await state.get_data()
+    page = state_data.get("page_group", 0)
+
     if data.startswith("-"):
         group = data[1:]
-        current_groups = get_user_values(user_id, "group")
-        if group in current_groups:
-            remove_value(user_id, "group", group)
+        if group in groups:
+            remove_user_group(user_id, group)
             await call.answer(f"❌ Группа «{group}» удалена.")
         else:
-            await call.answer(f"⚠️ Группа «{group}» не найдена.",
-                              show_alert=True)
-    # Очистка групп
+            await call.answer(f"⚠️ Группа «{group}» не найдена.", show_alert=True)
+
     elif data == "clear_all_group":
-        for group in get_user_values(user_id, "group"):
-            remove_value(user_id, "group", group)
+        remove_all_user_groups(user_id)
         await call.answer("🧹 Все группы удалены.")
-    # Обновление сообщения с группами
-    groups = get_user_values(user_id, "group")
+        page = 0  # сбрасываем на первую страницу
+
+    elif data.startswith("next_page_group_"):
+        page = int(data.split("_")[-1])
+
+    elif data.startswith("prev_page_group_"):
+        page = int(data.split("_")[-1])
+
+    groups = get_user_groups(user_id)
     if not groups:
         await call.message.edit_text("👥 У вас пока нет добавленных групп.")
     else:
-        await call.message.edit_reply_markup(reply_markup=get_inline_key_list(groups, "group"))
+        await call.message.edit_reply_markup(reply_markup=get_inline_key_list(groups, "group", page))
+
+    await state.update_data(page_group=page)
+
 
 
 async def show_dates(message: types.Message, state: FSMContext):
-    """Вывод дат"""
+    """Вывод дат пользователя"""
     user_id = message.from_user.id
-    dates = get_user_values(user_id, "date")
-    # Удаляем предыдущее сообщение
+    dates = get_user_dates(user_id)
+
     data = await state.get_data()
-    last_msg_id = data.get("last_groups_msg")
+    last_msg_id = data.get("last_dates_msg")
     if last_msg_id:
-        try:
-            await message.bot.edit_message_reply_markup(chat_id=message.chat.id,
-                                                        message_id=last_msg_id,
-                                                        reply_markup=None)
-        except:
-            pass
-    # Проверка на пустой список
+        await safe_remove_keyboard(message.bot, message.chat.id, last_msg_id)
+
     if not dates:
         sent = await message.answer("📅 У вас пока нет добавленных дат.")
     else:
-        sent = await message.answer("📅 Ваши даты:",
+        sent = await message.answer("📅 Ваши даты:"
+                                    "\n\nФормат ввода даты должен быть: DD, DD.\u200BMM или DD.MM.YYYY",
                                     reply_markup=get_inline_key_list(dates, "date"))
-    # Сохраняем ласт сообщение
+
     await state.update_data(last_dates_msg=sent.message_id)
     await state.set_state(MenuStates.DATE_EDIT.state)
 
 
 async def add_date(message: types.Message, state: FSMContext):
+    """Добавление даты с проверкой наличия даты в расписании"""
     text = message.text[1:].strip()
     if not text:
         return
-    # Преобразование даты
+
     try:
-        if len(text.split(".")) == 1:
-            day = int(text)
-            month = datetime.now().month
-            year = datetime.now().year
-        elif len(text.split(".")) == 2:
-            day, month = map(int, text.split("."))
-            year = datetime.now().year
-        else:
-            day, month, year = map(int, text.split("."))
-        date_obj = datetime(year, month, day)
-        date_str = date_obj.strftime("%Y-%m-%d")
+        date_str = format_to_db(text)
     except ValueError:
-        await message.answer("⚠️ Некорректный формат даты. Используйте DD.MM или DD.MM.YYYY")
+        await message.answer("⚠️ Некорректный формат даты или такой даты не существует в календаре. "
+                             "\n\nФормат даты должен быть: DD, DD.\u200BMM или DD.MM.YYYY", parse_mode=None)
+        return
+
+    # Проверка: есть ли вообще такая дата в БД расписания
+    if not is_date_in_schedule(date_str):
+        await message.answer(f"⚠️ На {date_str} нет расписания.")
         return
 
     user_id = message.from_user.id
-    current_dates = get_user_values(user_id, "date")
-    # Проверка на дубликаты
+    current_dates = get_user_dates(user_id)
+
     if date_str in current_dates:
         await message.answer(f"⚠️ Дата {date_str} уже добавлена.")
         return
-    # Запись в Бд
-    add_value(user_id, "date", date_str)
-    await message.answer(f"✅ Дата {date_str} добавлена.")
-    # Удаляем предыдущее сообщение
-    data = await state.get_data()
-    last_msg_id = data.get("last_dates_msg")
-    if last_msg_id:
-        try:
-            await message.bot.edit_message_reply_markup(chat_id=message.chat.id,
-                                                        message_id=last_msg_id,
-                                                        reply_markup=None)
-        except:
-            pass
 
-    updated_dates = get_user_values(user_id, "date")
-    sent = await message.answer("📅 Ваши даты:",
-                                reply_markup=get_inline_key_list(updated_dates, "date"))
-    await state.update_data(last_dates_msg=sent.message_id)
+    add_user_date(user_id, date_str)
+    await message.answer(f"✅ Дата {date_str} добавлена.")
+
+    await refresh_dates_message(message, state, user_id)
 
 
 async def remove_date(message: types.Message, state: FSMContext):
-    """Обработка удаления даты"""
-    date_input = message.text[1:].strip()
-    if not date_input:
+    """Удаление даты"""
+    text = message.text[1:].strip()
+    if not text:
         return
-    # Трансформация даты
+
     try:
-        if len(date_input.split(".")) == 1:
-            day = int(date_input)
-            month = datetime.now().month
-            year = datetime.now().year
-        elif len(date_input.split(".")) == 2:
-            day, month = map(int, date_input.split("."))
-            year = datetime.now().year
-        else:
-            day, month, year = map(int, date_input.split("."))
-        date_obj = datetime(year, month, day)
-        date_str = date_obj.strftime("%Y-%m-%d")
+        date_str = format_to_db(text)
     except ValueError:
-        await message.answer("⚠️ Некорректный формат даты. Используйте DD.MM или DD.MM.YYYY")
+        await message.answer("⚠️ Некорректный формат даты или такой даты не существует в календаре. "
+                             "\n\nФормат даты должен быть: DD, DD.\u200BMM или DD.MM.YYYY", parse_mode=None)
         return
 
     user_id = message.from_user.id
-    current_dates = get_user_values(user_id, "date")
-    # Проверка на присутствие даты
+    current_dates = get_user_dates(user_id)
+
     if date_str not in current_dates:
         await message.answer(f"⚠️ Дата {date_str} не найдена в списке.")
         return
-    remove_value(user_id, "date", date_str)
+
+    remove_user_date(user_id, date_str)
     await message.answer(f"❌ Дата {date_str} удалена.")
-    # Удаление предыдущего сообщения
-    data = await state.get_data()
-    last_msg_id = data.get("last_dates_msg")
-    if last_msg_id:
-        try:
-            await message.bot.edit_message_reply_markup(chat_id=message.chat.id,
-                                                        message_id=last_msg_id,
-                                                        reply_markup=None)
-        except:
-            pass
-    # Вывод сообщения
-    updated_dates = get_user_values(user_id, "date")
-    if not updated_dates:
-        sent = await message.answer("📅 У вас пока нет добавленных дат.")
-    else:
-        sent = await message.answer("📅 Ваши даты:",
-                                    reply_markup=get_inline_key_list(updated_dates, "date"))
-    await state.update_data(last_dates_msg=sent.message_id)
+
+    await refresh_dates_message(message, state, user_id)
 
 
 async def date_callback(call: types.CallbackQuery, state: FSMContext):
-    """Обработка инлайн кнопок с датами"""
+    """Инлайн-кнопки для дат"""
     user_id = call.from_user.id
     data = call.data
 
     if data.startswith("-"):
         date_str = data[1:]
-        current_dates = get_user_values(user_id, "date")
+        current_dates = get_user_dates(user_id)
+
         if date_str in current_dates:
-            remove_value(user_id, "date", date_str)
+            remove_user_date(user_id, date_str)
             await call.answer(f"❌ Дата {date_str} удалена.")
         else:
             await call.answer(f"⚠️ Дата {date_str} не найдена.", show_alert=True)
 
     elif data == "clear_all_date":
-        for date in get_user_values(user_id, "date"):
-            remove_value(user_id, "date", date)
+        remove_all_user_dates(user_id)
         await call.answer("🧹 Все даты удалены.")
 
-    dates = get_user_values(user_id, "date")
+    dates = get_user_dates(user_id)
     if not dates:
         await call.message.edit_text("📅 У вас пока нет добавленных дат.")
     else:
         await call.message.edit_reply_markup(reply_markup=get_inline_key_list(dates, "date"))
+
+
+async def safe_remove_keyboard(bot, chat_id, message_id):
+    """Безопасно удаляет клавиатуру у сообщения"""
+    try:
+        await bot.edit_message_reply_markup(chat_id=chat_id, message_id=message_id, reply_markup=None)
+    except:
+        pass
+
+
+async def refresh_groups_message(message, state, user_id):
+    """Обновить сообщение со списком групп"""
+    data = await state.get_data()
+    last_msg_id = data.get("last_groups_msg")
+    if last_msg_id:
+        await safe_remove_keyboard(message.bot, message.chat.id, last_msg_id)
+
+    groups = get_user_groups(user_id)
+    if not groups:
+        sent = await message.answer("👥 У вас пока нет добавленных групп.")
+    else:
+        sent = await message.answer("👥 Ваши группы:", reply_markup=get_inline_key_list(groups, "group"))
+
+    await state.update_data(last_groups_msg=sent.message_id)
+
+
+async def refresh_dates_message(message, state, user_id):
+    """Обновить сообщение со списком дат"""
+    data = await state.get_data()
+    last_msg_id = data.get("last_dates_msg")
+    if last_msg_id:
+        await safe_remove_keyboard(message.bot, message.chat.id, last_msg_id)
+
+    dates = get_user_dates(user_id)
+    if not dates:
+        sent = await message.answer("📅 У вас пока нет добавленных дат.")
+    else:
+        sent = await message.answer("📅 Ваши даты:"
+                                    "\n\nФормат ввода даты должен быть: DD, DD.\u200BMM или DD.MM.YYYY",
+                                    reply_markup=get_inline_key_list(dates, "date"))
+
+    await state.update_data(last_dates_msg=sent.message_id)
+
+
+def format_to_db(text: str) -> str:
+    """Преобразование строки вида DD, DD.MM, DD.MM.YYYY в YYYY-MM-DD с учетом перехода на следующий месяц"""
+    from datetime import datetime
+    today = datetime.now()
+
+    parts = list(map(int, text.split(".")))
+
+    if len(parts) == 1:
+        # Если только день указан
+        day = parts[0]
+        month = today.month
+        year = today.year
+        try:
+            temp_date = datetime(year, month, day)
+            if temp_date.date() < today.date():
+                # День уже прошел в этом месяце -> следующий месяц
+                if month == 12:
+                    month = 1
+                    year += 1
+                else:
+                    month += 1
+        except ValueError:
+            # День не существует в этом месяце (например 31 февраля), пробуем следующий месяц
+            if month == 12:
+                month = 1
+                year += 1
+            else:
+                month += 1
+    elif len(parts) == 2:
+        # День и месяц
+        day, month = parts
+        year = today.year
+    else:
+        # День, месяц и год
+        day, month, year = parts
+
+    date_obj = datetime(year, month, day)
+    return date_obj.strftime("%Y-%m-%d")
 
 
 def register_group_handlers(dp: Dispatcher):

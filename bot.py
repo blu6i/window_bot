@@ -3,8 +3,8 @@ import os
 from aiogram import Bot, Dispatcher, executor, types
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from dotenv import load_dotenv
+from sql import create_connection
 from bot import register_group_handlers, get_main_menu, register_search_handlers, register_link_handlers, register_main_handlers
-from sql import init_db, create_connection
 
 # Инициализация бота, диспетчера
 load_dotenv('config/.env')
@@ -34,5 +34,5 @@ register_main_handlers(dp)
 
 # Запуск
 if __name__ == "__main__":
-    init_db()
+    create_connection()
     executor.start_polling(dp, skip_updates=True)

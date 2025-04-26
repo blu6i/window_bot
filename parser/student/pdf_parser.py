@@ -7,9 +7,8 @@ import requests
 from pandas import DataFrame
 
 from parser.utils.formating_str import format_class
+from sql import add_groups, add_schedule
 from utils import logger
-
-from sql import add_groups, add_schedule, get_connection_gr, create_connection, build_sql
 
 DAYS_OF_WEEK = ['понедельник', 'вторник', 'среда', 'четверг', 'пятница', 'суббота', 'воскресенье']
 FIRST_CLASS_TIME = "08:20-09:50"
@@ -207,7 +206,6 @@ def main():
     # conn = create_connection()
     # cursor = conn.cursor()
     try:
-        build_sql()
         filename = parser_pdf(group_data)
         # filename.to_excel('fall.xlsx', index=False)
     except Exception as e:

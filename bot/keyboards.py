@@ -39,11 +39,34 @@ def get_menu_link():
     return keyboard
 
 
-def get_inline_key_list(items: list[str], data_type) -> InlineKeyboardMarkup:
-    """Генерация инлайн-кнопок из списка значений и кнопки 'Назад'"""
+def get_inline_key_list(items: list[str], data_type: str, page: int = 0) -> InlineKeyboardMarkup:
+    """Генерация инлайн-кнопок с постраничным выводом"""
+    from math import ceil
+
+    page_size = 12
+    max_page = ceil(len(items) / page_size) - 1
+    page = max(0, min(page, max_page))  # защита от выхода за пределы
+
+    start_i = page * page_size
+    end_i = start_i + page_size
+    items_on_page = items[start_i:end_i]
+
     keyboard = InlineKeyboardMarkup(row_width=2)
-    for item in items:
+
+    for item in items_on_page:
         keyboard.insert(InlineKeyboardButton(text=item, callback_data=f'-{item}'))
-    if len(items) > 2:
+
+    if items:
         keyboard.add(InlineKeyboardButton("🧹 Очистить всё", callback_data=f"clear_all_{data_type}"))
+
+    nav_buttons = []
+    if page > 0:
+        nav_buttons.append(InlineKeyboardButton("⬅️ Назад", callback_data=f"prev_page_{data_type}_{page-1}"))
+    if page < max_page:
+        nav_buttons.append(InlineKeyboardButton("➡️ Вперёд", callback_data=f"next_page_{data_type}_{page+1}"))
+
+    if nav_buttons:
+        keyboard.row(*nav_buttons)
+
     return keyboard
+

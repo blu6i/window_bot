@@ -1,25 +1,22 @@
-import os
 import sqlite3
 
 import pandas as pd
 
+from sql.init_connection import get_connection
 from utils import logger
-
-from sql.init_connection import get_connection_gr
 
 
 # Добавление предметов
-def add_subjects(conn, file_path: str):
+def add_subjects(file_path: str):
     """
     Пакетное добавление предметов
     Формат файла: название предмета
     Args:
-        conn: соединение с базой данных
         file_path: путь до файла
     """
     with open(file_path, 'r', encoding='utf-8') as file:
         subject_names = [line.strip() for line in file if line.strip()]
-
+    conn = get_connection()
     try:
         cursor = conn.cursor()
 
@@ -56,15 +53,15 @@ def add_subjects(conn, file_path: str):
 
 
 # Добавление факультета
-def add_faculties(conn, file_path: str):
+def add_faculties(file_path: str):
     """
     Читает факультеты из файла и добавляет их в БД, связывая с существующими институтами.
     Формат файла (каждая строка): факультет;аббревиатура;название_института
 
     Args:
-        conn: соединение с базой данных
         file_path: путь до файла с факультетами
     """
+    conn = get_connection()
     try:
         # Чтение и подготовка данных
         with open(file_path, 'r', encoding='utf-8') as file:
@@ -83,7 +80,6 @@ def add_faculties(conn, file_path: str):
         if not faculties_data:
             logger.warning("Файл не содержит данных для добавления")
             return
-
         cursor = conn.cursor()
         cursor.execute("BEGIN TRANSACTION")
 
@@ -129,16 +125,16 @@ def add_faculties(conn, file_path: str):
 
 
 # Добавление институтов
-def add_institutes(conn, file_path: str):
+def add_institutes(file_path: str):
     """
     Читает институты из файла и добавляет их в базу данных в том же порядке.
     Формат файла: Институт;аббревиатура
 
 
     Args:
-        conn: соединение с базой данных
         file_path: путь к файлу с институтами
     """
+    conn = get_connection()
     try:
         # Чтение данных из файла
         with open(file_path, 'r', encoding='utf-8') as file:
@@ -181,14 +177,14 @@ def add_institutes(conn, file_path: str):
 
 
 # Добавление специальностей
-def add_specializations(conn, file_path: str):
+def add_specializations(file_path: str):
     """
     Добавляет дисциплину из файла в базу данных
     Формат файла: Название дисциплины;аббревиатура;название факультета
     Args:
-        conn: соединение с базой данных
         file_path: путь до файла с дисциплинами
     """
+    conn = get_connection()
     try:
         # Чтение данных из файла
         with open(file_path, 'r', encoding='utf-8') as file:
@@ -207,7 +203,6 @@ def add_specializations(conn, file_path: str):
         if not specializations_data:
             logger.warning("Файл не содержит данных для добавления")
             return
-
         cursor = conn.cursor()
         cursor.execute("BEGIN TRANSACTION")
 
@@ -255,13 +250,11 @@ def add_specializations(conn, file_path: str):
 
 
 # Добавление уровня образования
-def add_educational_levels(conn):
+def add_educational_levels():
     """
     Добавляет стандартные уровни образования в таблицу EducationalLevel.
     Уровни: Бакалавриат (Б), Специалитет (С), Магистратура (М), Аспирантура (А)
 
-    Args:
-        conn: соединение с базой данных
     """
     standard_levels = [
         ("Бакалавриат", "б"),
@@ -270,6 +263,7 @@ def add_educational_levels(conn):
         ("Аспирантура", "а")
     ]
 
+    conn = get_connection()
     try:
         cursor = conn.cursor()
         cursor.execute("BEGIN TRANSACTION")
@@ -310,11 +304,9 @@ def add_groups(df: pd.DataFrame):
     Добавляет группу из второй строки DataFrame (аналогично чтению второй строки из Excel)
     Формат строки: факультет, название группы, специальность, уровень образования, институт, курс
     Args:
-        conn: соединение с базой данных
         df: DataFrame, содержащий хотя бы 2 строки
-        filename: имя "файла" — только для логов
     """
-    conn = get_connection_gr()
+    conn = get_connection()
     cursor = conn.cursor()
 
     if df.shape[0] < 2:
@@ -389,89 +381,6 @@ def add_groups(df: pd.DataFrame):
     conn.commit()
     logger.info(f"Группа '{group}' успешно добавлена")
 
-'''def add_groups(conn, folder_path: str):
-    """
-    Добавляет группы из excel в таблицу sql
-    Формат: факультет, название группы, курс, уровень образования, институт
-    Args:
-        conn: соединение с базой данных
-        folder_path: путь до папки с excel файлами
-    """
-    cursor = conn.cursor()
-
-    # Проходим по всем файлам в папке
-    for filename in os.listdir(folder_path):
-        if filename.endswith('.xlsx'):
-            excel_file_path = os.path.join(folder_path, filename)
-
-            # Читаем только вторую строку файла (индекс 1)
-            df = pd.read_excel(excel_file_path, header=None, skiprows=1, nrows=1)
-
-            # Извлекаем данные из второй строки
-            faculty = df.iloc[0, 0]  # Столбец "faculty"
-            group = df.iloc[0, 1]  # Столбец "group"
-            specialization = df.iloc[0, 2]  # Столбец "specilizations"
-            education_level = df.iloc[0, 3]  # Столбец "education_level"
-            institute = int(df.iloc[0, 4])  # Столбец "institute"
-            course = int(df.iloc[0, 5])  # Столбец "course"
-
-            # Находим FacultyID по имени факультета и InstituteID
-            cursor.execute("""
-                SELECT FacultyID 
-                FROM Faculties 
-                WHERE ShortName = ? AND InstituteID = ?
-            """, (faculty, institute))
-            faculty_id = cursor.fetchone()
-            if not faculty_id:
-                logger.warning(f"Факультет '{faculty}' с институтом '{institute}' не найден")
-                continue
-            faculty_id = faculty_id[0]
-
-            # Находим SpecializationID по ShortName специализации и FacultyID
-            cursor.execute("""
-                SELECT SpecializationID 
-                FROM Specializations 
-                WHERE ShortName = ? AND FacultyID = ?
-            """, (specialization, faculty_id))
-            specialization_id = cursor.fetchone()
-            if not specialization_id:
-                logger.warning(f"Специальность '{specialization}' с факультета '{faculty}' не найден")
-                continue
-            specialization_id = specialization_id[0]
-
-            # Находим LevelID по имени уровня образования
-            cursor.execute("""
-                SELECT LevelID 
-                FROM EducationalLevel 
-                WHERE ShortName = ?
-            """, (education_level,))
-            level_id = cursor.fetchone()
-            if not level_id:
-                logger.warning(f"Уровень образования '{education_level}' не найден")
-                continue
-            level_id = level_id[0]
-
-            # Проверяем, существует ли группа с таким названием
-            cursor.execute("""
-                SELECT GroupID 
-                FROM Groups 
-                WHERE GroupName = ?
-            """, (group,))
-            existing_group = cursor.fetchone()
-            if existing_group:
-                logger.warning(f"Группа '{group}' уже добавлена")
-                continue
-
-            # Вставляем новую группу в таблицу Groups
-            cursor.execute("""
-                INSERT INTO Groups (GroupName, SpecializationID, CourseNumber, LevelID) 
-                VALUES (?, ?, ?, ?)
-            """, (group, specialization_id, course, level_id))
-
-            # Сохраняем изменения в базе данных
-            conn.commit()
-            print(f"Группа '{group}' из файла '{filename}' добавлена")'''
-
 
 # Добавление расписания
 def add_schedule(df: pd.DataFrame):
@@ -482,7 +391,8 @@ def add_schedule(df: pd.DataFrame):
     Args:
         df: DataFrame с данными
     """
-    conn = get_connection_gr()
+    conn = get_connection()
+
     try:
         cursor = conn.cursor()
         cursor.execute("BEGIN TRANSACTION")
@@ -549,4 +459,36 @@ def add_schedule(df: pd.DataFrame):
         logger.error(f"Ошибка при добавлении расписания: {str(e)}")
 
 
+# Добавление выбранной группы
+def add_user_group(user_id: int, group_name: str):
+    """Добавить пользователю группу по названию"""
+    conn = get_connection()
+    cursor = conn.cursor()
 
+    # Найти ID группы по названию
+    cursor.execute("SELECT GroupID FROM Groups WHERE GroupName = ?", (group_name,))
+    row = cursor.fetchone()
+
+    group_id = row[0]
+
+    # Вставить в таблицу user_groups
+    cursor.execute(
+        "INSERT OR IGNORE INTO user_groups (user_id, group_id) VALUES (?, ?)",
+        (user_id, group_id)
+    )
+
+    conn.commit()
+
+
+# Добавление выбранной даты
+def add_user_date(user_id: int, date: str):
+    """Добавить пользователю дату"""
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute(
+        "INSERT INTO user_dates (user_id, date) VALUES (?, ?)",
+        (user_id, date)
+    )
+
+    conn.commit()
