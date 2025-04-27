@@ -460,24 +460,28 @@ def add_schedule(df: pd.DataFrame):
 
 
 # Добавление выбранной группы
-def add_user_group(user_id: int, group_name: str):
+def add_user_group(user_id: int, group_name: str) -> bool:
     """Добавить пользователю группу по названию"""
     conn = get_connection()
     cursor = conn.cursor()
 
-    # Найти ID группы по названию
     cursor.execute("SELECT GroupID FROM Groups WHERE GroupName = ?", (group_name,))
     row = cursor.fetchone()
 
+    if not row:
+        # Такую группу не нашли
+        return False
+
     group_id = row[0]
 
-    # Вставить в таблицу user_groups
     cursor.execute(
         "INSERT OR IGNORE INTO user_groups (user_id, group_id) VALUES (?, ?)",
         (user_id, group_id)
     )
 
     conn.commit()
+    return True
+
 
 
 # Добавление выбранной даты

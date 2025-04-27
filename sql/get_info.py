@@ -110,6 +110,41 @@ def get_groups(name: str) -> list[str]:
     return [row[0] for row in rows]
 
 
+# Получение ид групп из таблицы с расписанием
+def get_groups_id(name: str) -> list[int]:
+    """
+    Возвращает список названий групп, которые относятся к переданному названию
+    факультета, института или специальности.
+
+    Args:
+        name: строка (название факультета / института / специальности)
+    Returns:
+        список названий групп
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    query = """
+    SELECT G.GroupID
+    FROM Groups G
+    JOIN Specializations S ON G.SpecializationID = S.SpecializationID
+    JOIN Faculties F ON S.FacultyID = F.FacultyID
+    JOIN Institutes I ON F.InstituteID = I.InstituteID
+    WHERE S.SpecializationName = ?
+       OR S.ShortName = ?
+       OR F.FacultyName = ?
+       OR F.ShortName = ?
+       OR I.FullName = ?
+       OR I.ShortName = ?
+       OR G.GroupName = ?
+    """
+
+    cursor.execute(query, (name, name, name, name, name, name, name))
+    rows = cursor.fetchall()
+
+    return [row[0] for row in rows]
+
+
 # Получение похожих групп
 def find_like_groups(group: str) -> list[str]:
     """Поиск похожих групп по подстроке в названии."""
@@ -142,18 +177,47 @@ def get_all_groups() -> list[str]:
 
 
 # Получение списка групп пользователя
-def get_user_groups(user_id: int) -> list[tuple[int, str]]:
-    """Получить список (id, название) групп пользователя"""
+def get_user_groups(user_id: int) -> list[int]:
+    """Получить список ID групп пользователя"""
     conn = get_connection()
     cursor = conn.cursor()
 
     cursor.execute("""
-        SELECT g.GroupID, g.GroupName
+        SELECT g.GroupID
         FROM user_groups ug
         JOIN Groups g ON ug.group_id = g.GroupID
         WHERE ug.user_id = ?
     """, (user_id,))
-    return cursor.fetchall()
+
+    return [row[0] for row in cursor.fetchall()]
+
+
+def get_group_name(group_id: int) -> str | None:
+    """Получить название группы по её ID"""
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT GroupName FROM Groups WHERE GroupID = ?", (group_id,))
+    row = cursor.fetchone()
+
+    if row:
+        return row[0]
+    else:
+        return None
+
+
+def get_group_id(group_id: int) -> int | None:
+    """Получить название группы по её ID"""
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT GroupID FROM Groups WHERE GroupName = ?", (group_id,))
+    row = cursor.fetchone()
+
+    if row:
+        return row[0]
+    else:
+        return None
 
 
 # Получение списка дат пользователя

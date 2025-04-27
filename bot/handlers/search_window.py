@@ -1,6 +1,7 @@
 from aiogram import types, Dispatcher
 
-from sql import get_connection, get_user_groups, get_user_dates
+from bot.keyboards import get_main_menu
+from sql import get_connection, get_user_groups, get_user_dates, get_group_name
 
 # Предопределённые временные интервалы
 PAIR_TIMES = [
@@ -14,25 +15,20 @@ PAIR_TIMES = [
 ]
 
 
-def get_free_time(cursor, group_names: list[str], date: str) -> dict[str, list[str]]:
+def get_free_time(cursor, group_id: list[int], date: str) -> dict[str, list[str]]:
     """Получить свободные пары по группам на указанную дату"""
     free_slots = {}
 
-    for group in group_names:
-        cursor.execute("SELECT GroupID FROM Groups WHERE GroupName = ?", (group,))
-        result = cursor.fetchone()
-        if not result:
-            continue
-        group_id = result[0]
-
+    for id_ in group_id:
         cursor.execute("""
             SELECT Time FROM Schedule
             WHERE GroupID = ? AND Date = ?
-        """, (group_id, date))
+        """, (id_, date))
         occupied_times = {row[0] for row in cursor.fetchall()}
 
         free_times = [t for t in PAIR_TIMES if t not in occupied_times]
-        free_slots[group] = free_times
+        group_name = get_group_name(id_)
+        free_slots[group_name] = free_times
 
     return free_slots
 
@@ -63,7 +59,6 @@ async def handle_schedule_request(message: types.Message):
 
     if not groups or not dates:
         await message.answer("⚠️ Пожалуйста, добавьте хотя бы одну группу и дату перед поиском окон.")
-        conn.close()
         return
 
     results = []
@@ -74,11 +69,10 @@ async def handle_schedule_request(message: types.Message):
         if not common_slots:
             results.append(f"📅 {date}: свободных окон нет")
         else:
-            slots = ', '.join(sorted(common_slots))
+            slots = '\n'.join(sorted(common_slots))
             results.append(f"📅 {date}: {slots}")
 
-    await message.answer("\n".join(results))
-    conn.close()
+    await message.answer("\n".join(results), reply_markup=get_main_menu(user_id))
 
 
 def register_search_handlers(dp: Dispatcher):

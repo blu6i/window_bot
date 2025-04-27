@@ -13,13 +13,13 @@ PAIR_TIMES = [
 ]
 
 
-def get_free_time(conn: sqlite3.Connection, group_names: list[str], date: str) -> dict[str, list[str]]:
+def get_free_time(conn: sqlite3.Connection, group_id: list[id], date: str) -> dict[str, list[str]]:
     """
     Находит свободные пары у групп на указанную дату.
 
     Args:
         conn: соединение с SQLite
-        group_names: список названий групп
+        group_id: список названий групп
         date: дата в формате 'YYYY-MM-DD'
     Returns:
         словарь {GroupName: [свободные интервалы]}
@@ -27,22 +27,14 @@ def get_free_time(conn: sqlite3.Connection, group_names: list[str], date: str) -
     cursor = conn.cursor()
     free_slots = {}
 
-    for group in group_names:
-        # Получаем ID группы
-        cursor.execute("SELECT GroupID FROM Groups WHERE GroupName = ?", (group,))
-        result = cursor.fetchone()
-        if not result:
-            # Если группа не найдена — пропускаем (или можно записать None)
-            continue
-        group_id = result[0]
-
+    for group in group_id:
         # Получаем список занятых интервалов для группы на эту дату
         cursor.execute("""
             SELECT Time FROM Schedule
             WHERE GroupID = ? AND Date = ?
-        """, (group_id, date))
+        """, (group, date))
         occupied_times = {row[0] for row in cursor.fetchall()}
-
+        print('+')
         # Вычисляем свободные интервалы
         free_times = [t for t in PAIR_TIMES if t not in occupied_times]
         free_slots[group] = free_times
