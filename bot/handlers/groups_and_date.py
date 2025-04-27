@@ -1,12 +1,14 @@
-from datetime import datetime
+from typing import Union
 
 from aiogram import types, Dispatcher
 from aiogram.dispatcher import FSMContext
 
-from bot.keyboards import get_inline_key_list
+from bot.keyboards import get_inline_key_list, get_inline_key_add_groups
 from bot.states import MenuStates
-from sql import add_user_date, add_user_group, get_user_groups, get_user_dates, get_groups, is_check_entity, \
-    remove_user_group, remove_user_date, remove_all_user_dates, remove_all_user_groups, is_date_in_schedule
+from sql import get_all_groups, add_user_date, add_user_group, get_user_groups, get_user_dates, get_groups, \
+    is_check_entity, \
+    remove_user_group, remove_user_date, remove_all_user_dates, remove_all_user_groups, is_date_in_schedule, \
+    find_like_groups
 
 
 async def show_groups(message: types.Message, state: FSMContext):
@@ -30,7 +32,7 @@ async def show_groups(message: types.Message, state: FSMContext):
 
 
 async def add_group(message: types.Message, state: FSMContext):
-    """Добавление новой группы"""
+    """Обработка команды добавления группы через +название"""
     group = message.text[1:].strip()
     if not group:
         return
@@ -38,24 +40,42 @@ async def add_group(message: types.Message, state: FSMContext):
     user_id = message.from_user.id
     current_groups = get_user_groups(user_id)
 
-    if group in current_groups:
-        await message.answer(f"⚠️ Группа «{group}» уже добавлена.")
+    # 1. Проверка: пользователь ввел ПОЛНУЮ группу
+    if group in get_all_groups():  # get_all_groups() — функция, возвращающая список всех групп из базы
+        if group in current_groups:
+            await message.answer(f"⚠️ Группа «{group}» уже добавлена.")
+        else:
+            add_user_group(user_id, group)
+            await message.answer(f"✅ Группа «{group}» добавлена!")
+        await refresh_groups_message(message, state, user_id)
         return
 
-    if not is_check_entity(group):
+    # 2. Проверка: это факультет/институт/специальность?
+    if is_check_entity(group):  # Эта функция должна проверить наличие сущности в отдельной таблице
+        # Нашли сущность — выводим все группы по факультету/институту
+        groups = get_groups(group)  # get_groups() — получить список групп по факультету/специальности
+
+        if not groups:
+            await message.answer("⚠️ Нет групп, связанных с этой сущностью.")
+            return
+
+        await state.update_data(found_groups=groups)
+
+        keyboard = get_inline_key_add_groups(groups)  # генерация клавиатуры добавления групп
+        await message.answer("📚 Выберите группы для добавления:", reply_markup=keyboard)
+        return
+
+    # 3. Если ничего не нашли — пробуем найти похожие группы
+    similar_groups = find_like_groups(group)  # find_similar_groups() — искать похожие группы по подстроке
+
+    if similar_groups:
+        await state.update_data(found_groups=similar_groups)
+
+        keyboard = get_inline_key_add_groups(similar_groups)
+        await message.answer("🔍 Похожие группы найдены, выберите из списка:", reply_markup=keyboard)
+    else:
+        # 4. Ничего не найдено вообще
         await message.answer(f"⚠️ Неверно указана информация или её нет в базе.")
-        return
-
-    groups = get_groups(group)
-    list_group = []
-    for g in groups:
-        add_user_group(user_id, g)
-        list_group.append(g)
-
-    res = '\n'.join(list_group)
-    await message.answer(f"✅ Список пополнен:\n{res}")
-
-    await refresh_groups_message(message, state, user_id)
 
 
 async def remove_group(message: types.Message, state: FSMContext):
@@ -77,42 +97,27 @@ async def remove_group(message: types.Message, state: FSMContext):
     await refresh_groups_message(message, state, user_id)
 
 
-async def group_callback(call: types.CallbackQuery, state: FSMContext):
-    """Инлайн-кнопки для групп"""
+async def callback_remove_groups(call: types.CallbackQuery, state: FSMContext):
     user_id = call.from_user.id
     data = call.data
 
-    groups = get_user_groups(user_id)
-    state_data = await state.get_data()
-    page = state_data.get("page_group", 0)
+    if data.startswith('-'):
+        group_id = int(data[1:])  # Получаем ID группы из callback_data
+        success = remove_user_group(user_id, group_id)
 
-    if data.startswith("-"):
-        group = data[1:]
-        if group in groups:
-            remove_user_group(user_id, group)
-            await call.answer(f"❌ Группа «{group}» удалена.")
+        if success:
+            await call.answer(f"❌ Группа удалена")
+            # Получаем обновлённый список групп
+            groups = get_user_groups(user_id)
+            if not groups:
+                await call.message.edit_text("👥 У вас пока нет добавленных групп.")
+            else:
+                await call.message.edit_reply_markup(
+                    reply_markup=get_inline_key_list(groups, "group")
+                )
         else:
-            await call.answer(f"⚠️ Группа «{group}» не найдена.", show_alert=True)
-
-    elif data == "clear_all_group":
-        remove_all_user_groups(user_id)
-        await call.answer("🧹 Все группы удалены.")
-        page = 0  # сбрасываем на первую страницу
-
-    elif data.startswith("next_page_group_"):
-        page = int(data.split("_")[-1])
-
-    elif data.startswith("prev_page_group_"):
-        page = int(data.split("_")[-1])
-
-    groups = get_user_groups(user_id)
-    if not groups:
-        await call.message.edit_text("👥 У вас пока нет добавленных групп.")
-    else:
-        await call.message.edit_reply_markup(reply_markup=get_inline_key_list(groups, "group", page))
-
-    await state.update_data(page_group=page)
-
+            await call.answer("⚠️ Не удалось удалить группу", show_alert=True)
+        return
 
 
 async def show_dates(message: types.Message, state: FSMContext):
@@ -261,6 +266,28 @@ async def refresh_dates_message(message, state, user_id):
     await state.update_data(last_dates_msg=sent.message_id)
 
 
+async def refresh_add_group_message(message_or_query: Union[types.Message, types.CallbackQuery], state: FSMContext,
+                                    user_id: int):
+    """Обновление сообщения с меню выбора групп для добавления"""
+    data = await state.get_data()
+    groups = data.get('found_groups', [])
+    page = data.get('found_page', 0)
+
+    if not groups:
+        if isinstance(message_or_query, types.Message):
+            await message_or_query.answer("❗ Нет доступных групп для добавления.")
+        else:
+            await message_or_query.message.edit_text("❗ Нет доступных групп для добавления.")
+        return
+
+    keyboard = get_inline_key_add_groups(groups, page=page)
+
+    if isinstance(message_or_query, types.Message):
+        await message_or_query.answer("Выберите группы для добавления:", reply_markup=keyboard)
+    else:
+        await message_or_query.message.edit_text("Выберите группы для добавления:", reply_markup=keyboard)
+
+
 def format_to_db(text: str) -> str:
     """Преобразование строки вида DD, DD.MM, DD.MM.YYYY в YYYY-MM-DD с учетом перехода на следующий месяц"""
     from datetime import datetime
@@ -301,16 +328,108 @@ def format_to_db(text: str) -> str:
     return date_obj.strftime("%Y-%m-%d")
 
 
+async def callback_add_group(callback_query: types.CallbackQuery, state: FSMContext):
+    user_id = callback_query.from_user.id
+    group = callback_query.data[len("add_group_"):]
+
+    data = await state.get_data()
+    found_groups = data.get('found_groups', [])
+
+    # Проверка, что группа доступна для добавления
+    if group not in found_groups:
+        await callback_query.answer("⚠️ Группа уже была добавлена или недоступна.", show_alert=True)
+        return
+
+    # Добавление группы в список пользователя
+    current_groups = get_user_groups(user_id)
+    if group in current_groups:
+        await callback_query.answer(f"⚠️ Группа «{group}» уже добавлена.", show_alert=True)
+        return
+
+    add_user_group(user_id, group)
+
+    # Убираем добавленную группу из списка найденных групп
+    found_groups.remove(group)
+    await state.update_data(found_groups=found_groups)
+
+    await callback_query.answer(f"✅ Группа «{group}» добавлена!")
+
+    # Обновление клавиатуры после добавления
+    await refresh_add_group_message(callback_query, state, user_id)
+
+
+async def callback_add_all_groups(callback_query: types.CallbackQuery, state: FSMContext):
+    user_id = callback_query.from_user.id
+    data = await state.get_data()
+    groups = data.get('found_groups', [])
+
+    if not groups:
+        await callback_query.answer("❗ Нет доступных групп для добавления.", show_alert=True)
+        return
+
+    current_groups = get_user_groups(user_id)
+
+    added_groups = []
+    for group in groups:
+        if group not in current_groups:
+            add_user_group(user_id, group)
+            added_groups.append(group)
+
+    if added_groups:
+        res = "\n".join(added_groups)
+        await callback_query.answer(f"✅ Добавлены группы:\n{res}", show_alert=True)
+    else:
+        await callback_query.answer(f"⚠️ Все группы уже были добавлены.", show_alert=True)
+
+    # Возвращаем пользователя обратно в основное меню групп
+    await refresh_groups_message(callback_query.message, state, user_id)
+
+
+async def callback_back_to_groups(callback_query: types.CallbackQuery, state: FSMContext):
+    user_id = callback_query.from_user.id
+    await refresh_groups_message(callback_query.message, state, user_id)
+
+
+async def callback_change_add_page(callback_query: types.CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    groups = data.get('found_groups', [])
+    page = data.get('found_page', 0)
+
+    # Проверка на наличие групп
+    if not groups:
+        await callback_query.answer("❗ Нет доступных групп для добавления.", show_alert=True)
+        return
+
+    # Обработка перехода на следующую/предыдущую страницу
+    if "prev_page_add_" in callback_query.data:
+        page = max(0, page - 1)
+    elif "next_page_add_" in callback_query.data:
+        page = min(len(groups) // 10, page + 1)  # Ограничиваем количество страниц (по 10 групп на страницу)
+
+    # Обновление страницы в состоянии
+    await state.update_data(found_page=page)
+
+    # Обновляем клавиатуру с группами для текущей страницы
+    await refresh_add_group_message(callback_query, state, callback_query.from_user.id)
+
+
 def register_group_handlers(dp: Dispatcher):
-    """Регистрация хендлеров"""
+    # Сначала регистрируем специфичные обработчики
+    dp.register_callback_query_handler(callback_add_group, lambda c: c.data.startswith("add_group_"),
+                                       state=MenuStates.GROUP_EDIT)
+    dp.register_callback_query_handler(callback_add_all_groups, lambda c: c.data == "add_all_groups",
+                                       state=MenuStates.GROUP_EDIT)
+    dp.register_callback_query_handler(callback_change_add_page,
+                                       lambda c: "prev_page_add_" in c.data or "next_page_add_" in c.data,
+                                       state=MenuStates.GROUP_EDIT)
+    dp.register_callback_query_handler(callback_back_to_groups, lambda c: c.data == "back_to_groups",
+                                       state=MenuStates.GROUP_EDIT)
+
+    # Затем общие обработчики
+    dp.register_callback_query_handler(callback_remove_groups, lambda c: c.data.startswith('-') or c.data == "clear_all_group",
+                                       state=MenuStates.GROUP_EDIT)
+
+    # Остальные обработчики
     dp.register_message_handler(show_groups, text="👥 Изменить группы", state="*")
     dp.register_message_handler(add_group, lambda m: m.text.startswith('+'), state=MenuStates.GROUP_EDIT)
     dp.register_message_handler(remove_group, lambda m: m.text.startswith('-'), state=MenuStates.GROUP_EDIT)
-    dp.register_callback_query_handler(group_callback, lambda c: True, state=MenuStates.GROUP_EDIT)
-    dp.register_message_handler(show_groups, commands=["list_groups"], state='*')
-
-    dp.register_message_handler(show_dates, text="📅 Изменить даты", state="*")
-    dp.register_message_handler(show_dates, commands=["list_dates"], state='*')
-    dp.register_message_handler(add_date, lambda m: m.text.startswith('+'), state=MenuStates.DATE_EDIT)
-    dp.register_message_handler(remove_date, lambda m: m.text.startswith('-'), state=MenuStates.DATE_EDIT)
-    dp.register_callback_query_handler(date_callback, lambda c: True, state=MenuStates.DATE_EDIT)

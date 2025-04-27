@@ -110,19 +110,50 @@ def get_groups(name: str) -> list[str]:
     return [row[0] for row in rows]
 
 
+# Получение похожих групп
+def find_like_groups(group: str) -> list[str]:
+    """Поиск похожих групп по подстроке в названии."""
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    # Выполняем запрос, ищем группы, содержащие введенную подстроку (без учета регистра)
+    query = "SELECT GroupName FROM Groups WHERE GroupName LIKE ?"
+    cursor.execute(query, (f"%{group}%",))
+
+    # Получаем результаты
+    like_groups = [row[0] for row in cursor.fetchall()]
+
+    return like_groups
+
+
+def get_all_groups() -> list[str]:
+    """Получить список всех групп из базы данных."""
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    # Выполняем запрос, чтобы получить все группы
+    query = "SELECT GroupName FROM Groups"
+    cursor.execute(query)
+
+    # Получаем результаты
+    all_groups = [row[0] for row in cursor.fetchall()]
+
+    return all_groups
+
+
 # Получение списка групп пользователя
-def get_user_groups(user_id: int) -> list[str]:
-    """Получить список названий групп пользователя"""
+def get_user_groups(user_id: int) -> list[tuple[int, str]]:
+    """Получить список (id, название) групп пользователя"""
     conn = get_connection()
     cursor = conn.cursor()
 
     cursor.execute("""
-        SELECT g.GroupName
+        SELECT g.GroupID, g.GroupName
         FROM user_groups ug
         JOIN Groups g ON ug.group_id = g.GroupID
         WHERE ug.user_id = ?
     """, (user_id,))
-    return [row[0] for row in cursor.fetchall()]
+    return cursor.fetchall()
 
 
 # Получение списка дат пользователя

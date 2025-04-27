@@ -4,7 +4,7 @@ from sql.init_connection import get_connection
 from utils import logger
 
 
-def remove_user_group(user_id: int, group_id: int):
+def remove_user_group(user_id: int, group_id: int) -> bool:
     """Удаление привязки группы к пользователю"""
     conn = get_connection()
     cursor = conn.cursor()
@@ -13,6 +13,7 @@ def remove_user_group(user_id: int, group_id: int):
         (user_id, group_id)
     )
     conn.commit()
+    return cursor.rowcount > 0
 
 
 def remove_all_user_groups(user_id: int):
