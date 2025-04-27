@@ -98,26 +98,48 @@ async def remove_group(message: types.Message, state: FSMContext):
 
 
 async def callback_remove_groups(call: types.CallbackQuery, state: FSMContext):
+    """Обработчик инлайн-кнопок для групп"""
     user_id = call.from_user.id
     data = call.data
 
-    if data.startswith('-'):
-        group_id = int(data[1:])  # Получаем ID группы из callback_data
-        success = remove_user_group(user_id, group_id)
+    # Получаем текущие группы и данные состояния
+    groups = get_user_groups(user_id)
+    state_data = await state.get_data()
+    page = state_data.get("page_group", 0)
 
-        if success:
-            await call.answer(f"❌ Группа удалена")
-            # Получаем обновлённый список групп
-            groups = get_user_groups(user_id)
-            if not groups:
-                await call.message.edit_text("👥 У вас пока нет добавленных групп.")
-            else:
-                await call.message.edit_reply_markup(
-                    reply_markup=get_inline_key_list(groups, "group")
-                )
+    # Обработка удаления группы
+    if data.startswith("-"):
+        group = data[1:]  # Получаем ID группы из callback_data
+        if group in groups:
+            remove_user_group(user_id, group)
+            await call.answer(f"❌ Группа «{group}» удалена.")
         else:
-            await call.answer("⚠️ Не удалось удалить группу", show_alert=True)
-        return
+            await call.answer(f"⚠️ Группа «{group}» не найдена.", show_alert=True)
+
+    # Обработка удаления всех групп
+    elif data == "clear_all_group":
+        remove_all_user_groups(user_id)
+        await call.answer("🧹 Все группы удалены.")
+        page = 0  # Сброс на первую страницу
+
+    # Обработка переключения на следующую страницу
+    elif data.startswith("next_page_group_"):
+        page = int(data.split("_")[-1])
+
+    # Обработка переключения на предыдущую страницу
+    elif data.startswith("prev_page_group_"):
+        page = int(data.split("_")[-1])
+    groups = get_user_groups(user_id)
+    # Проверка наличия групп у пользователя
+    if not groups:
+        # Если групп нет, отправляем новое сообщение и удаляем клавиатуру
+        await call.message.edit_text("👥 У вас пока нет добавленных групп.")
+    else:
+        # Генерация клавиатуры с группами на текущей странице
+        await call.message.edit_reply_markup(reply_markup=get_inline_key_list(groups, "group", page))
+
+    # Обновляем состояние с текущей страницей
+    await state.update_data(page_group=page)
 
 
 async def show_dates(message: types.Message, state: FSMContext):
@@ -362,7 +384,7 @@ async def callback_add_all_groups(callback_query: types.CallbackQuery, state: FS
     user_id = callback_query.from_user.id
     data = await state.get_data()
     groups = data.get('found_groups', [])
-
+    print(groups)
     if not groups:
         await callback_query.answer("❗ Нет доступных групп для добавления.", show_alert=True)
         return
@@ -415,21 +437,34 @@ async def callback_change_add_page(callback_query: types.CallbackQuery, state: F
 
 def register_group_handlers(dp: Dispatcher):
     # Сначала регистрируем специфичные обработчики
-    dp.register_callback_query_handler(callback_add_group, lambda c: c.data.startswith("add_group_"),
+    dp.register_callback_query_handler(callback_add_group,
+                                       lambda c: c.data.startswith("add_group_"),
                                        state=MenuStates.GROUP_EDIT)
-    dp.register_callback_query_handler(callback_add_all_groups, lambda c: c.data == "add_all_groups",
+    dp.register_callback_query_handler(callback_add_all_groups,
+                                       lambda c: c.data == "add_all_groups",
                                        state=MenuStates.GROUP_EDIT)
     dp.register_callback_query_handler(callback_change_add_page,
                                        lambda c: "prev_page_add_" in c.data or "next_page_add_" in c.data,
                                        state=MenuStates.GROUP_EDIT)
-    dp.register_callback_query_handler(callback_back_to_groups, lambda c: c.data == "back_to_groups",
+    dp.register_callback_query_handler(callback_back_to_groups,
+                                       lambda c: c.data == "back_to_groups",
+                                       state=MenuStates.GROUP_EDIT)
+    dp.register_callback_query_handler(callback_remove_groups,
+                                       lambda m: 'next_page_' in m.data or 'prev_page_' in m.data,
                                        state=MenuStates.GROUP_EDIT)
 
     # Затем общие обработчики
-    dp.register_callback_query_handler(callback_remove_groups, lambda c: c.data.startswith('-') or c.data == "clear_all_group",
+    dp.register_callback_query_handler(callback_remove_groups,
+                                       lambda c: c.data.startswith('-') or c.data == "clear_all_group",
                                        state=MenuStates.GROUP_EDIT)
 
     # Остальные обработчики
-    dp.register_message_handler(show_groups, text="👥 Изменить группы", state="*")
-    dp.register_message_handler(add_group, lambda m: m.text.startswith('+'), state=MenuStates.GROUP_EDIT)
-    dp.register_message_handler(remove_group, lambda m: m.text.startswith('-'), state=MenuStates.GROUP_EDIT)
+    dp.register_message_handler(show_groups,
+                                text="👥 Изменить группы",
+                                state="*")
+    dp.register_message_handler(add_group,
+                                lambda m: m.text.startswith('+'),
+                                state=MenuStates.GROUP_EDIT)
+    dp.register_message_handler(remove_group,
+                                lambda m: m.text.startswith('-'),
+                                state=MenuStates.GROUP_EDIT)
