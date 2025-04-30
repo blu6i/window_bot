@@ -4,7 +4,7 @@ from aiogram import Bot, Dispatcher, executor, types
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from dotenv import load_dotenv
 from sql import create_connection
-from bot import register_group_handlers, get_main_menu, register_search_handlers, register_link_handlers, register_main_handlers, register_groups_handlers, register_date_handlers, register_add_groups_handlers
+from bot import get_main_menu, register_search_handlers, register_link_handlers, register_main_handlers, register_groups_handlers, register_date_handlers, register_add_groups_handlers
 
 # Инициализация бота, диспетчера
 load_dotenv('config/.env')

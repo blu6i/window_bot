@@ -109,31 +109,37 @@ def get_inline_key_add_groups(user_id: int, data: str, page: int = 0) -> InlineK
     found_groups = get_groups_id(data) or []
 
     # Получаем ID групп, которые у пользователя уже есть
-    user_group_id = get_user_groups(user_id)
+    added_groups = get_user_groups(user_id)
 
     # Фильтруем найденные группы — берём только те, которых нет у пользователя
-    available_groups = []
+    not_added_groups = []
     for id_ in found_groups:
-        if id_ not in user_group_id:
-            available_groups.append(id_)
+        if id_ not in added_groups:
+            not_added_groups.append(id_)
 
     page_size = 12
-    max_page = ceil(len(available_groups) / page_size) - 1
+    max_page = ceil(len(found_groups) / page_size) - 1
     page = max(0, min(page, max_page))
 
     start_i = page * page_size
     end_i = start_i + page_size
-    items_on_page = available_groups[start_i:end_i]
+    items_on_page = found_groups[start_i:end_i]
 
     keyboard = InlineKeyboardMarkup(row_width=2)
 
     for id_ in items_on_page:
-        keyboard.insert(InlineKeyboardButton(
-            text=get_group_name(id_),
-            callback_data=f"add_group_{id_}"
-        ))
+        if id_ in not_added_groups:
+            keyboard.insert(InlineKeyboardButton(
+                text=f'❌ {get_group_name(id_)}',
+                callback_data=f"add_group_{id_}"
+            ))
+        else:
+            keyboard.insert(InlineKeyboardButton(
+                text=f'✅ {get_group_name(id_)}',
+                callback_data=f"del_group_{id_}"
+            ))
 
-    if available_groups:
+    if not_added_groups:
         keyboard.add(InlineKeyboardButton("➕ Добавить всё", callback_data="add_all_groups"))
 
     nav_buttons = []
