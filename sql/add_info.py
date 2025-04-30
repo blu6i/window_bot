@@ -483,7 +483,6 @@ def add_user_group(user_id: int, group_name: str) -> bool:
     return True
 
 
-
 # Добавление выбранной даты
 def add_user_date(user_id: int, date: str):
     """Добавить пользователю дату"""

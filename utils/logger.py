@@ -6,33 +6,18 @@ from pathlib import Path
 
 def get_log_dir():
     """Определяет путь к папке с логами (на 2 уровня выше от utils/)"""
-    try:
-        # Базовый путь - на 2 уровня выше от расположения logger.py
-        base_path = Path(__file__).absolute().parent.parent
-        log_dir = base_path / "logs"  # Используем 'logs' вместо 'log' как более стандартный вариант
+    # Базовый путь - на 2 уровня выше от расположения logger.py
+    base_path = Path(__file__).absolute().parent.parent
+    log_dir = base_path / "logs"
 
-        # Создаем папку, если не существует
-        log_dir.mkdir(parents=True, exist_ok=True)
+    # Создаем папку, если не существует
+    log_dir.mkdir(parents=True, exist_ok=True)
 
-        # Проверяем доступность папки для записи
-        test_file = log_dir / ".write_test"
-        try:
-            test_file.touch()
-            test_file.unlink()
-        except (PermissionError, OSError) as e:
-            raise RuntimeError(f"Нет прав на запись в {log_dir}: {e}")
-
-        return log_dir
-
-    except Exception as e:
-        # Фолбэк на временную папку, если не удалось использовать основной путь
-        temp_log_dir = Path("/tmp") / "myapp_logs"
-        temp_log_dir.mkdir(exist_ok=True)
-        return temp_log_dir
+    return log_dir
 
 
 def setup_logger():
-    """Настройка логгера с ротацией логов"""
+    """Настройка логгера"""
     logger = logging.getLogger("window_bot")
     logger.setLevel(logging.INFO)  # Минимальный уровень логирования
 

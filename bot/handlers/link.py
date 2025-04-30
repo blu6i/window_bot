@@ -6,6 +6,7 @@ from bot import MenuStates, get_main_menu, get_menu_link
 
 
 async def show_schedule(message: types.Message):
+    """Линк на оф. бота с расписанием"""
     await message.answer(
         "📅 <b>Официальный бот с расписанием:</b>",
         reply_markup=InlineKeyboardMarkup().add(
@@ -26,6 +27,7 @@ async def show_attendance(message: types.Message):
 
 
 async def personal_account(message: types.Message):
+    """Вывод сообщения с линк на лк"""
     await message.answer(
         "🔐 <b>Личный кабинет ВятГУ:</b>",
         reply_markup=InlineKeyboardMarkup().add(
@@ -51,9 +53,19 @@ async def back_to_main(event, state: FSMContext):
 
 
 def register_link_handlers(dp: Dispatcher):
-    dp.register_message_handler(show_links, text="🔗 Ссылки быстрого доступа", state="*")
-    dp.register_message_handler(back_to_main, text="🔙 Назад", state=MenuStates.LINK_MENU)
+    dp.register_message_handler(show_links,
+                                text="🔗 Ссылки быстрого доступа",
+                                state="*")
+    dp.register_message_handler(back_to_main,
+                                text="🔙 Назад",
+                                state=MenuStates.LINK_MENU)
 
-    dp.register_message_handler(show_schedule, text="📅 Расписание", state="*")
-    dp.register_message_handler(show_attendance, text="📝 Отметка", state="*")
-    dp.register_message_handler(personal_account, text="📌 Личный кабинет", state="*")
+    dp.register_message_handler(show_schedule,
+                                text="📅 Расписание",
+                                state="*")
+    dp.register_message_handler(show_attendance,
+                                text="📝 Отметка",
+                                state="*")
+    dp.register_message_handler(personal_account,
+                                text="📌 Личный кабинет",
+                                state="*")

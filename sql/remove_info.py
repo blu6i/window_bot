@@ -50,6 +50,7 @@ def remove_all_user_dates(user_id: int):
 
 
 def remove_schedule():
+    """Удаление всего расписания"""
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("DELETE FROM Schedule")

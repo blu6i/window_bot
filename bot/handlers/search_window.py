@@ -18,14 +18,14 @@ PAIR_TIMES = [
 def get_free_time(cursor, group_id: list[int], date: str) -> dict[str, list[str]]:
     """Получить свободные пары по группам на указанную дату"""
     free_slots = {}
-
+    # Обход всех групп
     for id_ in group_id:
         cursor.execute("""
             SELECT Time FROM Schedule
             WHERE GroupID = ? AND Date = ?
         """, (id_, date))
         occupied_times = {row[0] for row in cursor.fetchall()}
-
+        # Формирование массива с временем, которого нет в БД
         free_times = [t for t in PAIR_TIMES if t not in occupied_times]
         group_name = get_group_name(id_)
         free_slots[group_name] = free_times
