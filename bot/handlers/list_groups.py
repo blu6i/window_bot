@@ -38,8 +38,8 @@ async def show_groups(message: types.Message, state: FSMContext):
 
 
 async def add_group(message: types.Message, state: FSMContext):
-    """Обработка команды добавления группы через +название"""
-    group = message.text[1:].strip()
+    """Обработка команды добавления группы через название"""
+    group = message.text.strip()
     if not group:
         return
 
@@ -78,26 +78,6 @@ async def add_group(message: types.Message, state: FSMContext):
     else:
         # 3. Ничего не найдено вообще
         await message.answer(f"⚠️ Неверно указана информация или её нет в базе.")
-
-
-async def remove_group(message: types.Message, state: FSMContext):
-    """Удаление группы"""
-    group_name = message.text[1:].strip()
-    group = get_group_id(group_name)
-    if not group:
-        return
-
-    user_id = message.from_user.id
-    current_groups = get_user_groups(user_id)
-
-    if group not in current_groups:
-        await message.answer(f"⚠️ Группа «{group}» не найдена в списке.")
-        return
-
-    remove_user_group(user_id, group)
-    await message.answer(f"❌ Группа «{group}» удалена.")
-
-    await refresh_groups_message(message, state, user_id)
 
 
 async def refresh_groups_message(message, state, user_id):
@@ -170,9 +150,10 @@ def register_groups_handlers(dp: Dispatcher):
     dp.register_message_handler(show_groups,
                                 commands=["list_groups"],
                                 state="*")
+
+    #dp.register_message_handler(add_group,
+    #                            lambda m: m.text.startswith('+'),
+    #                            state=MenuStates.GROUP_EDIT)
+
     dp.register_message_handler(add_group,
-                                lambda m: m.text.startswith('+'),
-                                state=MenuStates.GROUP_EDIT)
-    dp.register_message_handler(remove_group,
-                                lambda m: m.text.startswith('-'),
                                 state=MenuStates.GROUP_EDIT)

@@ -3,6 +3,7 @@ from typing import Union
 from aiogram import types, Dispatcher
 from aiogram.dispatcher import FSMContext
 
+from bot.handlers.utils import remove_keyboard
 from bot.keyboards import get_inline_key_list, get_inline_key_add_groups
 from bot.states import MenuStates
 from sql import add_user_group, get_user_groups, get_group_name, remove_user_group
@@ -15,16 +16,12 @@ async def callback_add_group(call: types.CallbackQuery, state: FSMContext):
     user_id = call.from_user.id
     group_id = call.data[len("add_group_"):]
     group = get_group_name(group_id)
-    # data = await state.get_data()
-    # found_groups = data.get('found_groups', [])
 
     add_user_group(user_id, group)
 
-    # Убираем добавленную группу из списка найденных групп
-    # found_groups.remove(group)
-    # await state.update_data(found_groups=found_groups)
     text = f"✅ Группа «{group}» добавлена!"
     await state.update_data(message=text)
+
     # Обновление клавиатуры после добавления
     await refresh_add_group_message(call, state, user_id)
 
@@ -74,7 +71,9 @@ async def callback_back_to_groups(call: types.CallbackQuery, state: FSMContext):
     try:
         user_id = call.from_user.id
         groups = get_user_groups(user_id)
-
+        data = await state.get_data()
+        last_msg_id = data.get("last_groups_msg")
+        await remove_keyboard(call.bot, call.message.chat.id, last_msg_id)
         # Вывод меню с группами
         if not groups:
             await call.message.edit_text(
@@ -121,18 +120,10 @@ async def refresh_add_group_message(message_or_query: Union[types.Message, types
                                     user_id: int):
     """Обновление сообщения с меню выбора групп для добавления"""
     data = await state.get_data()
-    # groups = data.get('found_groups', [])
     page = data.get('found_page', 0)
     text = data.get('message', '📚 Выберите группы для добавления:')
-    # if not groups:
-    #    if isinstance(message_or_query, types.Message):
-    #        await message_or_query.answer("❗ Нет доступных групп для добавления.")
-    #    else:
-    #        await message_or_query.message.edit_text("❗ Нет доступных групп для добавления.")
-    #    return
     data = data.get('actual_data')
     keyboard = get_inline_key_add_groups(user_id, data, page=page)
-
     if isinstance(message_or_query, types.Message):
         await message_or_query.answer(f"{text}", reply_markup=keyboard)
     else:
