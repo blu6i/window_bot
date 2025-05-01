@@ -188,7 +188,6 @@ def get_user_groups(user_id: int) -> list[int]:
         JOIN Groups g ON ug.group_id = g.GroupID
         WHERE ug.user_id = ?
     """, (user_id,))
-
     return [row[0] for row in cursor.fetchall()]
 
 

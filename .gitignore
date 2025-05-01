@@ -15,9 +15,10 @@ info_for_db/
 data/
 test_venv/
 *.db
-sql/search_window.py
-bot/handlers/groups_and_date.py
-parser/teacher
-utils/get_unique_objects.py
-utils/import_subjects.py
-update_data.py
+sql/.search_window.py
+bot/handlers/.groups_and_date.py
+bot/handlers/.main_menu.py
+parser/.teacher
+utils/.get_unique_objects.py
+utils/.import_subjects.py
+.update_data.py

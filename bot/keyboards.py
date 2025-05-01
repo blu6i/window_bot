@@ -1,46 +1,58 @@
 import os
 from math import ceil
 
-from aiogram.types import KeyboardButton, ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from dotenv import load_dotenv
 
-from sql import get_user_groups, get_group_name, get_groups, get_groups_id, get_user_dates
+from sql import get_user_groups, get_group_name, get_groups_id, get_user_dates
 
 load_dotenv('config/.env')
 TOKEN = os.getenv('ADMIN_ID')
 
 
 def get_main_menu(u_id: int):
-    """ Выводит основное меню """
-    keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
+    keyboard = InlineKeyboardMarkup()
 
-    buttons = [
-        ['🪟 Окна в расписании'],
-        ['👥 Изменить группы', '📅 Изменить даты'],
-        ['ℹ️ Помощь'],
-        ['🔗 Ссылки быстрого доступа']
-    ]
+    # 1-я строка — 1 кнопка
+    keyboard.row(InlineKeyboardButton("🪟 Окна в расписании", callback_data="menu_windows"))
+
+    # Получаем группы и даты пользователя
     groups = get_user_groups(u_id)
-    if not groups:
-        buttons[1] = ['👥 Добавить группы', '📅 Добавить даты']
+    dates = get_user_dates(u_id)
+
+    group_button = InlineKeyboardButton(
+        "👥 Добавить группы" if not groups else "👥 Изменить группы",
+        callback_data="menu_groups"
+    )
+    date_button = InlineKeyboardButton(
+        "📅 Добавить даты" if not dates else "📅 Изменить даты",
+        callback_data="menu_dates"
+    )
+    keyboard.row(group_button, date_button)
+
+    keyboard.row(InlineKeyboardButton("ℹ️ Помощь", callback_data="help"))
+
+    keyboard.row(InlineKeyboardButton("🔗 Ссылки быстрого доступа", callback_data="menu_links"))
+
+    # Доп. строка для админа
     if u_id == int(TOKEN):
-        buttons.append(['🔄 Обновить расписание'])
-    for row in buttons:
-        keyboard.row(*[KeyboardButton(btn) for btn in row])
+        keyboard.row(InlineKeyboardButton("🔄 Обновить расписание", callback_data="refresh_schedule"))
 
     return keyboard
 
 
 def get_menu_link():
-    """ Выводит меню со ссылками """
-    keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
-    buttons = [
-        ["📅 Расписание", "📝 Отметка"],
-        ["📌 Личный кабинет"],
-        ["🔙 Назад"]
-    ]
-    for row in buttons:
-        keyboard.row(*[KeyboardButton(btn) for btn in row])
+    """Выводит меню со ссылками (инлайн-кнопки)"""
+    keyboard = InlineKeyboardMarkup()
+
+    keyboard.row(
+        InlineKeyboardButton("📅 Официальный бот ВятГУ", url="https://t.me/Vyatsu_chatbot"),
+        InlineKeyboardButton("📌 Личный кабинет ВятГУ", url="https://new.vyatsu.ru/account/")
+    )
+
+    keyboard.row(
+        InlineKeyboardButton("🔙 Назад", callback_data="back_to_menu")
+    )
 
     return keyboard
 
@@ -98,7 +110,7 @@ def get_inline_key_list(user_id: int, data_type: str, page: int = 0) -> InlineKe
 
     if nav_buttons:
         keyboard.row(*nav_buttons)
-
+    keyboard.row(InlineKeyboardButton("🔙 Назад", callback_data="back_to_menu"))
     return keyboard
 
 
@@ -145,11 +157,11 @@ def get_inline_key_add_groups(user_id: int, data: str, page: int = 0) -> InlineK
     nav_buttons = []
     if page > 0:
         nav_buttons.append(InlineKeyboardButton(
-            "⬅️ Назад", callback_data=f"prev_page_add_{page-1}"
+            "⬅️ Назад", callback_data=f"prev_page_add_{page - 1}"
         ))
     if page < max_page:
         nav_buttons.append(InlineKeyboardButton(
-            "➡️ Вперёд", callback_data=f"next_page_add_{page+1}"
+            "➡️ Вперёд", callback_data=f"next_page_add_{page + 1}"
         ))
 
     if nav_buttons:
@@ -158,5 +170,3 @@ def get_inline_key_add_groups(user_id: int, data: str, page: int = 0) -> InlineK
     keyboard.add(InlineKeyboardButton("🔙 Назад", callback_data="back_to_groups"))
 
     return keyboard
-
-
