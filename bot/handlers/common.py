@@ -25,10 +25,10 @@ WELCOME_TEXT = ("Добро пожаловать в бота для поиска
                 )
 
 
-async def remove_keyboard(bot, chat_id, message_id):
+async def remove_keyboard(bot, chat_id, msg_id):
     """Удаляет сообщение с кнопками"""
     try:
-        await bot.delete_message(chat_id=chat_id, message_id=message_id)
+        await bot.delete_message(chat_id=chat_id, message_id=msg_id)
     except Exception as e:
         logger.error(f'Ошибка при удалении сообщение с кнопками {e}')
 

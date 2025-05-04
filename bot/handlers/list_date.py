@@ -1,17 +1,39 @@
 from datetime import datetime
+from typing import Union
 
 from aiogram import types, Dispatcher
 from aiogram.dispatcher import FSMContext
+from aiogram.types import CallbackQuery, Message
 
 from bot.keyboards import get_inline_key_list
 from bot.states import MenuStates
 from sql import add_user_date, get_user_dates, remove_user_date, remove_all_user_dates, is_date_in_schedule
 from utils import logger
 
-from .common import remove_keyboard
+
+async def show_dates(event: Union[CallbackQuery, Message], state: FSMContext):
+    """Вывод дат пользователя"""
+    u_id = event.from_user.id
+    u_dates = get_user_dates(u_id)
+
+    if not u_dates:
+        text = "📅 У вас пока нет добавленных дат."
+    else:
+        text = "📅 Ваши даты:\n\nФормат ввода даты должен быть: DD, DD.MM или DD.MM.YYYY"
+
+    keyboard = get_inline_key_list(u_id, "date")
+
+    if isinstance(event, CallbackQuery):
+        sent = await event.message.edit_text(text, reply_markup=keyboard)
+        await event.answer()
+    else:
+        sent = await event.answer(text, reply_markup=keyboard)
+
+    await state.update_data(last_msg=sent.message_id)
+    await state.set_state(MenuStates.DATE_EDIT.state)
 
 
-async def show_dates(call: types.CallbackQuery, state: FSMContext):
+'''async def show_dates(call: types.CallbackQuery, state: FSMContext):
     """Вывод дат пользователя"""
     u_id = call.from_user.id
     u_dates = get_user_dates(u_id)
@@ -26,7 +48,7 @@ async def show_dates(call: types.CallbackQuery, state: FSMContext):
 
     await state.update_data(last_msg=sent.message_id)
     await state.set_state(MenuStates.DATE_EDIT.state)
-    await call.answer()
+    await call.answer()'''
 
 
 async def add_date(msg: types.Message, state: FSMContext):
@@ -163,10 +185,9 @@ def register_date_handlers(dp: Dispatcher):
     dp.register_callback_query_handler(show_dates,
                                        lambda c: c.data == 'menu_dates',
                                        state="*")
-    # Меню с датами (!Переделать)
     dp.register_message_handler(show_dates,
-                                commands=["list_dates"],
-                                state='*')
+                                commands=['dates'],
+                                state="*")
     # Добавление даты
     dp.register_message_handler(add_date,
                                 lambda m: not m.text.startswith('/'),

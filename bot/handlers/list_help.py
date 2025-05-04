@@ -1,16 +1,18 @@
-from aiogram import types, Dispatcher
+from typing import Union
+
+from aiogram import Dispatcher
 from aiogram.dispatcher import FSMContext
+from aiogram.types import CallbackQuery, Message
 
 from bot import get_main_menu
-from bot.handlers.common import remove_keyboard
 
 HELP_TEXT = ("<b>Основные функции:</b>\n"
              "🪟 <b>Окна в расписании</b> - поиск свободного времени\n"
              "👥 <b>Управление группами</b> - управление своим списком групп\n"
              "📅 <b>Управление датами</b> - управление своим списком дат\n"
              "<b>Ссылки быстрого доступа:</b>\n"
-             "📅 Официальный бот ВятГУ - ссылка на официального бота ВятГУ\n"
-             "📌 Личный кабинет ВятГУ - ссылка на личный кабинет ВятГУ\n"
+             "📅 Бот ВятГУ - ссылка на официального бота ВятГУ\n"
+             "📌 ЛК ВятГУ - ссылка на личный кабинет ВятГУ\n"
              "\n"
              "<b>Как добавить группу?</b>\n"
              "1. Перейти в нужный раздел\n"
@@ -49,18 +51,23 @@ HELP_TEXT = ("<b>Основные функции:</b>\n"
              "2. Нажать на нужную дату для удаления")
 
 
-async def send_help(call: types.CallbackQuery, state: FSMContext):
-    """ Обработка ввода команды /help """
-    data = await state.get_data()
-    last_msg_id = data.get('last_msg')
-    await remove_keyboard(call.message.bot, call.message.chat.id, last_msg_id)
-    await call.message.answer(HELP_TEXT,
-                              parse_mode="HTML")
-    last_msg = await call.message.answer("🏠 Главное меню\n\nВыберите нужный раздел",
-                                         reply_markup=get_main_menu(call.from_user.id),
-                                         parse_mode='HTML')
-    await state.update_data(last_msg=last_msg.message_id)
-    await call.answer()
+async def send_help(event: Union[CallbackQuery, Message], state: FSMContext):
+    """Обработка /help или кнопки ℹ️ Помощь"""
+    u_id = event.from_user.id
+
+    if isinstance(event, CallbackQuery):
+        await event.answer()
+        await event.message.edit_text(HELP_TEXT, parse_mode="HTML")
+        menu_msg = await event.message.answer("🏠 Главное меню\n\nВыберите нужный раздел",
+                                              reply_markup=get_main_menu(u_id),
+                                              parse_mode="HTML")
+    else:
+        await event.answer(HELP_TEXT, parse_mode="HTML")  # Показываем помощь
+        menu_msg = await event.answer("🏠 Главное меню\n\nВыберите нужный раздел",
+                                      reply_markup=get_main_menu(u_id),
+                                      parse_mode="HTML")
+
+    await state.update_data(last_msg=menu_msg.message_id)
 
 
 def register_help_handlers(dp: Dispatcher):

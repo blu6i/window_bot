@@ -1,5 +1,8 @@
+from typing import Union
+
 from aiogram import types, Dispatcher
 from aiogram.dispatcher import FSMContext
+from aiogram.types import CallbackQuery, Message
 
 import sql
 from bot.handlers.common import remove_keyboard
@@ -7,21 +10,23 @@ from bot.keyboards import get_inline_key_list, get_inline_key_add_groups
 from bot.states import MenuStates
 
 
-async def show_groups(call: types.CallbackQuery, state: FSMContext):
+async def show_groups(event: Union[CallbackQuery, Message], state: FSMContext):
     """Вывод групп пользователя"""
-    u_id = call.from_user.id
+    u_id = event.from_user.id
     u_groups = sql.get_user_groups(u_id)
 
-    if not u_groups:
-        sent = await call.message.edit_text("👥 У вас пока нет добавленных групп.",
-                                            reply_markup=get_inline_key_list(u_id, "group"))
+    text = "👥 У вас пока нет добавленных групп." if not u_groups else "👥 Ваши группы:\nНажмите на них для удаления"
+    keyboard = get_inline_key_list(u_id, "group")
+
+    # Обработка отправки в зависимости от типа события
+    if isinstance(event, CallbackQuery):
+        sent = await event.message.edit_text(text, reply_markup=keyboard)
+        await event.answer()
     else:
-        sent = await call.message.edit_text("👥 Ваши группы:\nНажмите на них для удаления",
-                                            reply_markup=get_inline_key_list(u_id, "group"))
+        sent = await event.answer(text, reply_markup=keyboard)
 
     await state.update_data(last_msg=sent.message_id)
     await state.set_state(MenuStates.GROUP_EDIT.state)
-    await call.answer()
 
 
 async def add_group(msg: types.Message, state: FSMContext):
@@ -108,6 +113,13 @@ async def list_user_groups(call: types.CallbackQuery, state: FSMContext):
 
 
 def register_groups_handlers(dp: Dispatcher):
+    # Меню групп
+    dp.register_callback_query_handler(show_groups,
+                                       lambda c: c.data == "menu_groups",
+                                       state="*")
+    dp.register_message_handler(show_groups,
+                                commands=["groups"],
+                                state="*")
     # Навигация
     dp.register_callback_query_handler(list_user_groups,
                                        lambda c: 'next_page_' in c.data or 'prev_page_' in c.data,
@@ -116,14 +128,6 @@ def register_groups_handlers(dp: Dispatcher):
     dp.register_callback_query_handler(list_user_groups,
                                        lambda c: c.data.startswith('-') or c.data == "clear_all_group",
                                        state=MenuStates.GROUP_EDIT)
-    # Вывод меню
-    dp.register_callback_query_handler(show_groups,
-                                       lambda c: c.data == "menu_groups",
-                                       state="*")
-    # Вывод меню через команду (!Переделать)
-    dp.register_message_handler(show_groups,
-                                commands=["list_groups"],
-                                state="*")
     # Добавление групп
     dp.register_message_handler(add_group,
                                 lambda m: not m.text.startswith('/'),

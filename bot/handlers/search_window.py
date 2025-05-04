@@ -1,7 +1,10 @@
-from aiogram import types, Dispatcher
-from aiogram.dispatcher import FSMContext
+from typing import Union
 
-from bot.keyboards import get_main_menu, get_inline_key_list
+from aiogram import Dispatcher
+from aiogram.dispatcher import FSMContext
+from aiogram.types import CallbackQuery, Message
+
+from bot.keyboards import get_main_menu
 from sql import get_connection, get_user_groups, get_user_dates, get_group_name
 from utils import logger
 
@@ -49,30 +52,31 @@ def get_set_free_time(free_slots: dict[str, list[str]]) -> set[str]:
     return common_slots
 
 
-async def callback_search_window(call: types.CallbackQuery, state: FSMContext):
-    """Обработка запроса на поиск свободных окон"""
-    u_id = call.from_user.id
-    data = await state.get_data()
-    last_msg_id = data.get("last_msg")
-    if last_msg_id is None:
-        logger.warning('У пользователя обнулился кэш с последним сообщением')
-        await call.answer()
-        return
-    conn = get_connection()
-    cursor = conn.cursor()
+async def search_window_handler(event: Union[CallbackQuery, Message], state: FSMContext):
+    """Обработка поиска свободных окон (по кнопке или команде)"""
+    u_id = event.from_user.id
 
     u_groups = get_user_groups(u_id)
     u_dates = get_user_dates(u_id)
+    text_menu = "🏠 Главное меню\n\nВыберите нужный раздел"
     if not u_groups or not u_dates:
-        await call.bot.edit_message_text("⚠️ Пожалуйста, добавьте хотя бы одну группу и дату перед поиском окон.",
-                                         chat_id=call.message.chat.id,
-                                         message_id=last_msg_id,
-                                         reply_markup=get_inline_key_list(u_id, "date")
-                                         )
-        await call.answer()
+        text = "⚠️ Пожалуйста, добавьте хотя бы одну группу и дату перед поиском окон."
+
+        if isinstance(event, CallbackQuery):
+            await event.message.edit_text(text)
+            await event.message.answer(text_menu,
+                                       reply_markup=get_main_menu(u_id))
+        else:
+            await event.answer(text)
+            await event.answer(text_menu,
+                               reply_markup=get_main_menu(u_id))
         return
 
+    # Формируем текст окон
+    conn = get_connection()
+    cursor = conn.cursor()
     results = []
+
     for date in u_dates:
         free_slots = get_free_time(cursor, u_groups, date)
         common_slots = get_set_free_time(free_slots)
@@ -81,21 +85,38 @@ async def callback_search_window(call: types.CallbackQuery, state: FSMContext):
             results.append(f"📅 {date}: свободных окон нет")
         else:
             slots = '\n'.join(sorted(common_slots))
-            results.append(f"📅 {date}: \n{slots}\n")
-    try:
-        await call.bot.edit_message_text("\n".join(results),
-                                         chat_id=call.message.chat.id,
-                                         message_id=last_msg_id,
-                                         reply_markup=get_main_menu(u_id))
-    except Exception as e:
-        logger.error(f'Ошибка при выводе окон {e}')
-    await call.answer()
+            results.append(f"📅 {date}:\n{slots}\n")
+
+    text_windows = "\n".join(results)
+
+    if isinstance(event, CallbackQuery):
+        await event.answer()
+        try:
+            # Сообщение с окнами
+            await event.message.edit_text(text_windows)
+            # Главное меню
+            menu_msg = await event.message.answer(text_menu, reply_markup=get_main_menu(u_id))
+            await state.update_data(last_msg=menu_msg.message_id)
+        except Exception as e:
+            logger.error(f"Ошибка при выводе окон: {e}")
+    else:
+        # Сообщение с окнами
+        await event.answer(text_windows)
+
+        # Главное меню
+        menu_msg = await event.answer(text_menu, reply_markup=get_main_menu(u_id))
+        await state.update_data(last_msg=menu_msg.message_id)
 
 
 def register_search_handlers(dp: Dispatcher):
     # Вывод окон
-    dp.register_callback_query_handler(callback_search_window,
-                                       lambda c: c.data == 'menu_windows',
-                                       state="*")
-    # Вывод окон через команду (!Переделать)
-    dp.register_message_handler(callback_search_window, commands=["search_window"], state="*")
+    dp.register_callback_query_handler(
+        search_window_handler,
+        lambda c: c.data == "menu_windows",
+        state="*"
+    )
+    dp.register_message_handler(
+        search_window_handler,
+        commands=["windows"],
+        state="*"
+    )

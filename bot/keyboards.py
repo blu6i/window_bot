@@ -16,16 +16,12 @@ def get_main_menu(u_id: int):
     # 1-я строка — 1 кнопка
     keyboard.row(InlineKeyboardButton("🪟 Окна в расписании", callback_data="menu_windows"))
 
-    # Получаем группы и даты пользователя
-    groups = get_user_groups(u_id)
-    dates = get_user_dates(u_id)
-
     group_button = InlineKeyboardButton(
-        "👥 Добавить группы" if not groups else "👥 Изменить группы",
+        "👥 Группы",
         callback_data="menu_groups"
     )
     date_button = InlineKeyboardButton(
-        "📅 Добавить даты" if not dates else "📅 Изменить даты",
+        "📅 Даты",
         callback_data="menu_dates"
     )
     keyboard.row(group_button, date_button)
@@ -46,8 +42,8 @@ def get_menu_link():
     keyboard = InlineKeyboardMarkup()
 
     keyboard.row(
-        InlineKeyboardButton("📅 Официальный бот ВятГУ", url="https://t.me/Vyatsu_chatbot"),
-        InlineKeyboardButton("📌 Личный кабинет ВятГУ", url="https://new.vyatsu.ru/account/")
+        InlineKeyboardButton("📅 Бот ВятГУ", url="https://t.me/Vyatsu_chatbot"),
+        InlineKeyboardButton("📌 ЛК ВятГУ", url="https://new.vyatsu.ru/account/")
     )
 
     keyboard.row(
