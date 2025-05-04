@@ -15,7 +15,7 @@ async def show_groups(event: Union[CallbackQuery, Message], state: FSMContext):
     u_id = event.from_user.id
     u_groups = sql.get_user_groups(u_id)
 
-    text = "👥 У вас пока нет добавленных групп." if not u_groups else "👥 Ваши группы:\nНажмите на них для удаления"
+    text = "👥 У вас пока нет добавленных групп." if not u_groups else "👥 Ваши группы:\nНажмите на группу для удаления"
     keyboard = get_inline_key_list(u_id, "group")
 
     # Обработка отправки в зависимости от типа события
@@ -101,8 +101,10 @@ async def list_user_groups(call: types.CallbackQuery, state: FSMContext):
     # Обработка переключения страниц
     elif data.startswith("next_page_group_"):
         page = int(data.split("_")[-1])
+        text = "👥 Ваши группы:\nНажмите на группу для удаления"
     elif data.startswith("prev_page_group_"):
         page = int(data.split("_")[-1])
+        text = "👥 Ваши группы:\nНажмите на группу для удаления"
 
     # Обновление сообщения
     await call.message.edit_text(text,
