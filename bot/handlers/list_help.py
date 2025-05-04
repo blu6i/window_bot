@@ -59,7 +59,7 @@ async def send_help(call: types.CallbackQuery, state: FSMContext):
     last_msg = await call.message.answer("🏠 Главное меню\n\nВыберите нужный раздел",
                                          reply_markup=get_main_menu(call.from_user.id),
                                          parse_mode='HTML')
-    await state.update_data(last_msg=last_msg)
+    await state.update_data(last_msg=last_msg.message_id)
     await call.answer()
 
 
