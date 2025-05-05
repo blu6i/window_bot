@@ -3,7 +3,9 @@ from aiogram.dispatcher import FSMContext
 from aiogram.types import ReplyKeyboardRemove
 
 from bot import get_main_menu
+from sql import remove_schedule
 from utils import logger
+from parser import groups_web_parse
 
 WELCOME_TEXT = ("Добро пожаловать в бота для поиска свободных окон в расписании групп!\n"
                 "\n"
@@ -23,6 +25,19 @@ WELCOME_TEXT = ("Добро пожаловать в бота для поиска
                 "\n"
                 "Дополнительная информация — в разделе ℹ️ <b>Помощь</b>."
                 )
+
+LINK = 'https://www.vyatsu.ru/studentu-1/spravochnaya-informatsiya/raspisanie-zanyatiy-dlya-studentov.html'
+
+
+async def update_db(call: types.CallbackQuery):
+    await call.message.answer('⏳ Запуск парсинга...')
+    await call.answer()
+    try:
+        remove_schedule()
+        groups_web_parse(LINK)
+        await call.message.answer(f'✅ Парсинг завершен')
+    except Exception as e:
+        await call.message.answer(f'⚠️ Ошибка при парсинге\n{e}')
 
 
 async def remove_keyboard(bot, chat_id, msg_id):
@@ -64,3 +79,7 @@ def register_common_handlers(dp: Dispatcher):
     dp.register_message_handler(cmd_start,
                                 commands=["start"],
                                 state="*")
+    # Запуск парсера
+    dp.register_callback_query_handler(update_db,
+                                       lambda c: c.data == "refresh_schedule",
+                                       state='*')

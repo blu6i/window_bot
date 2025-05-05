@@ -22,6 +22,7 @@ def get_connection():
     if _conn is None:
         try:
             _conn = sqlite3.connect(LINK_DB)
+            create_tables()
             logger.info(f"Подключено к {LINK_DB}, версия SQLite: {sqlite3.version}")
         except sqlite3.Error as e:
             logger.error(f'Ошибка инициализации таблицы {str(e)}')
@@ -84,12 +85,13 @@ def create_tables():
         # 6. Пользователи
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS Users (
-            UserID INTEGER PRIMARY KEY
+        UserID INTEGER PRIMARY KEY AUTOINCREMENT,
+        CurrentID INTEGER NOT NULL UNIQUE
         )""")
 
         # 7. Группы пользователей
         cursor.execute("""
-        CREATE TABLE IF NOT EXISTS user_groups (
+        CREATE TABLE IF NOT EXISTS UserGroups (
             UserID INTEGER NOT NULL,
             GroupID INTEGER NOT NULL,
             PRIMARY KEY (UserID, GroupID),
@@ -99,7 +101,7 @@ def create_tables():
 
         # 8. Даты пользователей
         cursor.execute("""
-        CREATE TABLE IF NOT EXISTS user_dates (
+        CREATE TABLE IF NOT EXISTS UserDates (
             UserID INTEGER NOT NULL,
             Date TEXT NOT NULL,
             PRIMARY KEY (UserID, Date),

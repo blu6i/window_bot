@@ -5,7 +5,7 @@ from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from dotenv import load_dotenv
 
 import bot
-from sql import get_connection
+from sql import get_connection, build_sql
 from utils import logger
 
 # Инициализация бота, диспетчера
@@ -24,11 +24,11 @@ bot.register_search_handlers(dp)
 bot.register_link_handlers(dp)
 bot.register_common_handlers(dp)
 bot.register_help_handlers(dp)
-bot.register_parser_handlers(dp)
 
 # Запуск
 if __name__ == "__main__":
     conn = get_connection()
+    build_sql()
     try:
         executor.start_polling(dp, skip_updates=True)
     finally:

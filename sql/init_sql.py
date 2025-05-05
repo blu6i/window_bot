@@ -1,4 +1,4 @@
-from sql.add_info import (add_institutes, add_faculties, add_educational_levels,
+from sql.add_info import (add_institutes, add_faculties,
                           add_specializations)
 from utils import logger
 
@@ -12,5 +12,4 @@ def build_sql():
     add_institutes(PATH_INST)
     add_faculties(PATH_FAC)
     add_specializations(PATH_SPEC)
-    add_educational_levels()
     logger.info("Таблицы успешно созданы")

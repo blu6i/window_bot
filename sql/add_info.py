@@ -1,55 +1,11 @@
 import sqlite3
+from datetime import datetime
 
 import pandas as pd
 
 from sql.init_connection import get_connection
+from sql.get_info import get_user_id
 from utils import logger
-
-
-# Добавление предметов
-def add_subjects(file_path: str):
-    """
-    Пакетное добавление предметов
-    Формат файла: название предмета
-    Args:
-        file_path: путь до файла
-    """
-    with open(file_path, 'r', encoding='utf-8') as file:
-        subject_names = [line.strip() for line in file if line.strip()]
-    conn = get_connection()
-    try:
-        cursor = conn.cursor()
-
-        # Получаем существующие предметы
-        cursor.execute("SELECT SubjectName FROM Subjects")
-        existing = {row[0] for row in cursor.fetchall()}
-
-        # Фильтруем новые предметы
-        new_subjects = [
-            (name.strip(),) for name in subject_names
-            if name.strip() not in existing
-        ]
-
-        if not new_subjects:
-            dup_count = len(subject_names)
-            logger.info(f"Все {dup_count} предметов уже существуют")
-            return
-        # Пакетная вставка
-        cursor.executemany(
-            "INSERT INTO Subjects (SubjectName) VALUES (?)",
-            new_subjects
-        )
-
-        conn.commit()
-
-        added = len(new_subjects)
-        duplicates = [name for name in subject_names if name.strip() in existing]
-
-        logger.info(f"Добавлено {added} предметов, {len(duplicates)} дубликатов")
-
-    except sqlite3.Error as e:
-        conn.rollback()
-        logger.error(f"Ошибка пакетного добавления: {str(e)}")
 
 
 # Добавление факультета
@@ -88,7 +44,7 @@ def add_faculties(file_path: str):
         institute_map = {name: id_ for id_, name in cursor.fetchall()}
 
         # Добавляем факультеты
-        added_count = 0
+        count = 0
         missing_institutes = set()
 
         for faculty_name, faculty_short, institute_name in faculties_data:
@@ -100,7 +56,7 @@ def add_faculties(file_path: str):
                 cursor.execute(
                     "INSERT INTO Faculties (FacultyName, ShortName, InstituteID) VALUES (?, ?, ?)",
                     (faculty_name, faculty_short, institute_map[institute_name]))
-                added_count += 1
+                count += 1
             except sqlite3.IntegrityError:
                 logger.warning(f"Факультет уже существует: {faculty_name}")
             except Exception as e:
@@ -112,12 +68,12 @@ def add_faculties(file_path: str):
         if missing_institutes:
             logger.warning(f"Следующие институты не найдены: {', '.join(missing_institutes)}")
 
-        logger.info(f"Успешно добавлено {added_count} факультетов")
+        logger.info(f"Успешно добавлено {count} факультетов")
 
     except FileNotFoundError:
         logger.error(f"Файл не найден: {file_path}")
     except UnicodeDecodeError:
-        logger.error("Ошибка декодирования файла. Убедитесь, что файл в кодировке UTF-8")
+        logger.error("Ошибка декодирования файла.")
     except Exception as e:
         conn.rollback()
         logger.error(f"Критическая ошибка: {str(e)}")
@@ -147,14 +103,10 @@ def add_institutes(file_path: str):
                 full_name, short_name = line.split(';', 1)
                 institutes_data.append((full_name.strip(), short_name.strip()))
 
-        if not institutes_data:
-            logger.warning("Файл не содержит данных для добавления")
-            return
-
         # Добавление в базу данных
         cursor = conn.cursor()
         cursor.execute("BEGIN TRANSACTION")
-
+        count = 0
         for full_name, short_name in institutes_data:
             try:
                 cursor.execute(
@@ -162,12 +114,13 @@ def add_institutes(file_path: str):
                     (full_name, short_name)
                 )
                 logger.debug(f"Добавлен институт: {full_name} ({short_name})")
+                count += 1
             except sqlite3.IntegrityError:
                 logger.warning(f"Пропуск дубликата: {full_name} ({short_name})")
                 continue
 
         conn.commit()
-        logger.info(f"Успешно добавлено {len(institutes_data)} институтов из файла")
+        logger.info(f"Успешно добавлено {count} институтов из файла")
 
     except FileNotFoundError:
         logger.error(f"Файл не найден: {file_path}")
@@ -200,9 +153,6 @@ def add_specializations(file_path: str):
             spec_name, short_name, faculty_name = map(str.strip, line.split(';'))
             specializations_data.append((spec_name, short_name, faculty_name))
 
-        if not specializations_data:
-            logger.warning("Файл не содержит данных для добавления")
-            return
         cursor = conn.cursor()
         cursor.execute("BEGIN TRANSACTION")
 
@@ -211,7 +161,7 @@ def add_specializations(file_path: str):
         faculty_map = {name: id_ for id_, name in cursor.fetchall()}
 
         # Добавляем специальности
-        added_count = 0
+        count = 0
         missing_faculties = set()
 
         for spec_name, short_name, faculty_name in specializations_data:
@@ -225,7 +175,7 @@ def add_specializations(file_path: str):
                     (SpecializationName, ShortName, FacultyID) 
                     VALUES (?, ?, ?)""",
                     (spec_name, short_name, faculty_map[faculty_name]))
-                added_count += 1
+                count += 1
             except sqlite3.IntegrityError:
                 logger.warning(f"Специальность уже существует: {spec_name}")
             except Exception as e:
@@ -237,7 +187,7 @@ def add_specializations(file_path: str):
         if missing_faculties:
             logger.warning(f"Следующие факультеты не найдены: {', '.join(missing_faculties)}")
 
-        logger.info(f"Успешно добавлено {added_count} специальностей")
+        logger.info(f"Успешно добавлено {count} специальностей")
 
     except FileNotFoundError:
         logger.error(f"Файл не найден: {file_path}")
@@ -247,55 +197,6 @@ def add_specializations(file_path: str):
         conn.rollback()
         logger.error(f"Критическая ошибка: {str(e)}")
         raise
-
-
-# Добавление уровня образования
-def add_educational_levels():
-    """
-    Добавляет стандартные уровни образования в таблицу EducationalLevel.
-    Уровни: Бакалавриат (Б), Специалитет (С), Магистратура (М), Аспирантура (А)
-
-    """
-    standard_levels = [
-        ("Бакалавриат", "б"),
-        ("Специалитет", "с"),
-        ("Магистратура", "м"),
-        ("Аспирантура", "а")
-    ]
-
-    conn = get_connection()
-    try:
-        cursor = conn.cursor()
-        cursor.execute("BEGIN TRANSACTION")
-
-        # Проверяем существующие уровни, чтобы избежать дубликатов
-        cursor.execute("SELECT LevelName, ShortName FROM EducationalLevel")
-        existing_levels = {(row[0], row[1]) for row in cursor.fetchall()}
-
-        added_count = 0
-
-        for level_name, short_name in standard_levels:
-            if (level_name, short_name) not in existing_levels:
-                try:
-                    cursor.execute(
-                        "INSERT INTO EducationalLevel (LevelName, ShortName) VALUES (?, ?)",
-                        (level_name, short_name)
-                    )
-                    added_count += 1
-                    logger.debug(f"Добавлен уровень образования: {level_name} ({short_name})")
-                except sqlite3.IntegrityError:
-                    # На случай параллельного добавления
-                    continue
-
-        conn.commit()
-        logger.info(f"Добавлено {added_count} новых уровней образования из {len(standard_levels)} возможных")
-
-        return added_count
-
-    except sqlite3.Error as e:
-        conn.rollback()
-        logger.error(f"Ошибка при добавлении уровней образования: {str(e)}")
-        return 0
 
 
 # Добавление групп
@@ -309,77 +210,62 @@ def add_groups(df: pd.DataFrame):
     conn = get_connection()
     cursor = conn.cursor()
 
-    if df.shape[0] < 2:
-        logger.warning(f"DataFrame содержит меньше двух строк — нечего читать")
+    if df.shape[0] < 1:
+        logger.warning("DataFrame пустой — нечего добавлять")
         return
 
     try:
-        # Извлекаем данные из второй строки
-        faculty = df.iloc[0, 0]  # Столбец "faculty"
-        group = df.iloc[0, 1]  # Столбец "group"
-        specialization = df.iloc[0, 2]  # Столбец "specilizations"
-        education_level = df.iloc[0, 3]  # Столбец "education_level"
-        institute = int(df.iloc[0, 4])  # Столбец "institute"
-        course = int(df.iloc[0, 5])  # Столбец "course"
+        faculty_short = df.iloc[0, 0]  # ShortName факультета
+        group_name = df.iloc[0, 1]  # Название группы
+        specialization_short = df.iloc[0, 2]  # ShortName специальности
+        institute_id = int(df.iloc[0, 4])  # ID института
     except Exception as e:
         logger.warning(f"Ошибка при чтении строки: {e}")
         return
 
-    # Получаем FacultyID
-    cursor.execute("""
-        SELECT FacultyID 
-        FROM Faculties 
-        WHERE ShortName = ? AND InstituteID = ?
-    """, (faculty, institute))
-    faculty_id = cursor.fetchone()
-    if not faculty_id:
-        logger.warning(f"Факультет '{faculty}' с институтом '{institute}' не найден")
-        return
-    faculty_id = faculty_id[0]
+    try:
+        # Получаем FacultyID
+        cursor.execute("""
+            SELECT FacultyID 
+            FROM Faculties 
+            WHERE ShortName = ? AND InstituteID = ?
+        """, (faculty_short, institute_id))
+        faculty_id = cursor.fetchone()
+        if not faculty_id:
+            logger.warning(f"Факультет '{faculty_short}' с институтом ID '{institute_id}' не найден")
+            return
+        faculty_id = faculty_id[0]
 
-    # Получаем SpecializationID
-    cursor.execute("""
-        SELECT SpecializationID 
-        FROM Specializations 
-        WHERE ShortName = ? AND FacultyID = ?
-    """, (specialization, faculty_id))
-    specialization_id = cursor.fetchone()
-    if not specialization_id:
-        logger.warning(f"Специальность '{specialization}' не найдена")
-        return
-    specialization_id = specialization_id[0]
+        # Получаем SpecializationID
+        cursor.execute("""
+            SELECT SpecializationID 
+            FROM Specializations 
+            WHERE ShortName = ? AND FacultyID = ?
+        """, (specialization_short, faculty_id))
+        specialization_id = cursor.fetchone()
+        if not specialization_id:
+            logger.warning(f"Специальность '{specialization_short}' не найдена")
+            return
+        specialization_id = specialization_id[0]
 
-    # Получаем LevelID
-    cursor.execute("""
-        SELECT LevelID 
-        FROM EducationalLevel 
-        WHERE ShortName = ?
-    """, (education_level,))
-    level_id = cursor.fetchone()
-    if not level_id:
-        logger.warning(f"Уровень образования '{education_level}' не найден")
-        return
-    level_id = level_id[0]
+        # Проверяем, существует ли группа
+        cursor.execute("SELECT GroupID FROM Groups WHERE GroupName = ?", (group_name,))
+        if cursor.fetchone():
+            logger.warning(f"Группа '{group_name}' уже существует")
+            return
 
-    # Проверяем, существует ли группа
-    cursor.execute("""
-        SELECT GroupID 
-        FROM Groups 
-        WHERE GroupName = ?
-    """, (group,))
-    existing_group = cursor.fetchone()
-    if existing_group:
-        logger.warning(f"Группа '{group}' уже добавлена")
-        return
+        # Вставляем группу
+        cursor.execute("""
+            INSERT INTO Groups (GroupName, SpecializationID) 
+            VALUES (?, ?)
+        """, (group_name, specialization_id))
 
-    # Вставляем новую группу
-    cursor.execute("""
-        INSERT INTO Groups (GroupName, SpecializationID, CourseNumber, LevelID) 
-        VALUES (?, ?, ?, ?)
-    """, (group, specialization_id, course, level_id))
+        conn.commit()
+        logger.info(f"Группа '{group_name}' успешно добавлена")
 
-    conn.commit()
-    logger.info(f"Группа '{group}' успешно добавлена")
+    except sqlite3.Error as e:
+        conn.rollback()
+        logger.error(f"Ошибка при добавлении группы: {e}")
 
 
 # Добавление расписания
@@ -399,28 +285,29 @@ def add_schedule(df: pd.DataFrame):
 
         # Кэш групп
         cursor.execute("SELECT GroupID, GroupName FROM Groups")
-        group_cache = {name: id_ for id_, name in cursor.fetchall()}
+        group_cache = {name.strip(): id_ for id_, name in cursor.fetchall()}
 
-        # Кэш предметов
-        cursor.execute("SELECT SubjectID, SubjectName FROM Subjects")
-        subject_cache = {name: id_ for id_, name in cursor.fetchall()}
-
-        required_columns = ['group', 'date', 'day', 'time', 'subject']
-        if not all(col in df.columns for col in required_columns):
-            missing = set(required_columns) - set(df.columns)
-            logger.warning(f"Отсутствуют колонки: {missing}")
-            return
+        required_columns = ['group', 'date', 'time', 'subject']
 
         schedule_data = df[required_columns].dropna().drop_duplicates()
         added_count = 0
+        today = datetime.today().date()
 
         for _, row in schedule_data.iterrows():
-            group_name = str(row['group']).strip()
-            subject_name = str(row['subject']).strip()
-            if not subject_name:
+            try:
+                # Проверка на актуальность дат
+                date_str = str(row['date']).strip()
+                row_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+                if row_date < today:
+                    continue  # Пропускаем устаревшие записи
+            except Exception as e:
+                logger.warning(f"Ошибка при обработке даты: {e}")
                 continue
-            date = str(row['date']).strip()
-            day = str(row['day']).strip()
+            subject = str(row['subject']).strip()
+            if not subject:
+                continue  # Пропускаем строку без названия предмета
+
+            group_name = str(row['group']).strip()
             time = str(row['time']).strip()
 
             group_id = group_cache.get(group_name)
@@ -428,27 +315,10 @@ def add_schedule(df: pd.DataFrame):
                 logger.warning(f"Группа '{group_name}' не найдена")
                 continue
 
-            subject_id = subject_cache.get(subject_name)
-            if not subject_id:
-                try:
-                    cursor.execute(
-                        "INSERT INTO Subjects (SubjectName) VALUES (?)",
-                        (subject_name,)
-                    )
-                    subject_id = cursor.lastrowid
-                    subject_cache[subject_name] = subject_id
-                except sqlite3.IntegrityError:
-                    cursor.execute(
-                        "SELECT SubjectID FROM Subjects WHERE SubjectName = ?",
-                        (subject_name,)
-                    )
-                    subject_id = cursor.fetchone()[0]
-                    subject_cache[subject_name] = subject_id
-
             cursor.execute("""
-                INSERT INTO Schedule (GroupID, Date, Day, Time, SubjectID)
-                VALUES (?, ?, ?, ?, ?)
-            """, (group_id, date, day, time, subject_id))
+                    INSERT INTO Schedule (GroupID, Date, Time)
+                    VALUES (?, ?, ?)
+                """, (group_id, date_str, time))
             added_count += 1
 
         conn.commit()
@@ -459,39 +329,45 @@ def add_schedule(df: pd.DataFrame):
         logger.error(f"Ошибка при добавлении расписания: {str(e)}")
 
 
-# Добавление выбранной группы
-def add_user_group(user_id: int, group_name: str) -> bool:
-    """Добавить пользователю группу по названию"""
+# Добавление группы пользователю
+def add_user_group(user: int, group_name: str) -> bool:
+    """
+        Добавить пользователю выбранную группу.
+        Если пользователя нет в базе, то сначала добавляем его.
+    """
+    user_id = get_user_id(user)
+
     conn = get_connection()
     cursor = conn.cursor()
 
     cursor.execute("SELECT GroupID FROM Groups WHERE GroupName = ?", (group_name,))
     row = cursor.fetchone()
-
     if not row:
-        # Такую группу не нашли
         return False
 
     group_id = row[0]
 
     cursor.execute(
-        "INSERT OR IGNORE INTO user_groups (user_id, group_id) VALUES (?, ?)",
+        "INSERT OR IGNORE INTO UserGroups (UserID, GroupID) VALUES (?, ?)",
         (user_id, group_id)
     )
-
     conn.commit()
     return True
 
 
-# Добавление выбранной даты
-def add_user_date(user_id: int, date: str):
-    """Добавить пользователю дату"""
+# Добавление даты пользователю
+def add_user_date(user: int, date: str):
+    """
+    Добавить пользователю выбранную дату.
+    Если пользователя нет в базе, то сначала добавляем его.
+    """
+    user_id = get_user_id(user)
+
     conn = get_connection()
     cursor = conn.cursor()
 
     cursor.execute(
-        "INSERT INTO user_dates (user_id, date) VALUES (?, ?)",
+        "INSERT INTO UserDates (UserID, Date) VALUES (?, ?)",
         (user_id, date)
     )
-
     conn.commit()

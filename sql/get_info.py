@@ -8,34 +8,27 @@ from sql.init_connection import get_connection
 PATTERN_GROUP = r"^[а-яА-ЯёЁ]+-\d{4}-\d{2}-\d{2}$"
 
 
-# Проверка, что дата есть в БД
-def is_schedule_on_date(date_str: str) -> bool:
-    """
-    Проверяет, существует ли расписание хотя бы для одной группы на указанную дату.
-    Принимает дату в формате 'DD.MM.YYYY' и преобразует её к 'YYYY-MM-DD'.
-    Args:
-        date_str: дата в формате 'DD.MM.YYYY'
-    Returns:
-        True если расписание есть, иначе False
-    """
+# Получение ид пользователя
+def get_user_id(user: int) -> int:
     conn = get_connection()
-    try:
-        # Преобразуем в формат YYYY-MM-DD
-        parsed_date = datetime.strptime(date_str, "%d.%m.%Y").strftime("%Y-%m-%d")
-    except ValueError:
-        # Если дата некорректна
-        return False
     cursor = conn.cursor()
-    cursor.execute("SELECT 1 FROM Schedule WHERE Date = ? LIMIT 1", (parsed_date,))
-    return cursor.fetchone() is not None
+
+    cursor.execute("SELECT UserID FROM Users WHERE CurrentID = ?", (user,))
+    row = cursor.fetchone()
+
+    if row:
+        return row[0]
+
+    cursor.execute("INSERT INTO Users (CurrentID) VALUES (?)", (user,))
+    conn.commit()
+    return cursor.lastrowid
 
 
 # Проверка, что элемент есть в БД
 def is_check_entity(search_str: str) -> bool:
     """
     Проверяет, существует ли группа/факультет/институт/направление в бд
-    !!! Старая версия. В новой теперь проверяем возвращает ли поиск что-то, если возвращает, то это есть
-    в базе данных, а следовательно существует
+
     Args:
         search_str: строка с данными
     Returns:
@@ -75,7 +68,7 @@ def is_check_entity(search_str: str) -> bool:
     return False
 
 
-# Получение групп из таблицы с расписанием
+# Получение имен групп из таблицы с расписанием
 def get_groups(name: str) -> list[str]:
     """
     Возвращает список названий групп, которые относятся к переданному названию
@@ -145,22 +138,6 @@ def get_groups_id(name: str) -> list[int]:
     return [row[0] for row in rows]
 
 
-# Получение похожих групп
-def find_like_groups(group: str) -> list[str]:
-    """Поиск похожих групп по подстроке в названии."""
-    conn = get_connection()
-    cursor = conn.cursor()
-
-    # Выполняем запрос, ищем группы, содержащие введенную подстроку (без учета регистра)
-    query = "SELECT GroupName FROM Groups WHERE GroupName LIKE ?"
-    cursor.execute(query, (f"%{group}%",))
-
-    # Получаем результаты
-    like_groups = [row[0] for row in cursor.fetchall()]
-
-    return like_groups
-
-
 def get_all_groups() -> list[str]:
     """Получить список всех групп из базы данных."""
     conn = get_connection()
@@ -177,17 +154,34 @@ def get_all_groups() -> list[str]:
 
 
 # Получение списка групп пользователя
-def get_user_groups(user_id: int) -> list[int]:
+def get_user_groups(user: int) -> list[int]:
     """Получить список ID групп пользователя"""
+    user_id = get_user_id(user)
+
     conn = get_connection()
     cursor = conn.cursor()
 
     cursor.execute("""
-        SELECT g.GroupID
-        FROM user_groups ug
-        JOIN Groups g ON ug.group_id = g.GroupID
-        WHERE ug.user_id = ?
-    """, (user_id,))
+            SELECT GroupID
+            FROM UserGroups
+            WHERE UserID = ?
+        """, (user_id,))
+
+    return [row[0] for row in cursor.fetchall()]
+
+
+# Получение списка дат пользователя
+def get_user_dates(user: int) -> list[str]:
+    """Получить список дат пользователя"""
+    user_id = get_user_id(user)
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute(
+        "SELECT Date FROM UserDates WHERE UserID = ?",
+        (user_id,)
+    )
     return [row[0] for row in cursor.fetchall()]
 
 
@@ -205,31 +199,18 @@ def get_group_name(group_id: int) -> str | None:
         return None
 
 
-def get_group_id(group_id: int) -> int | None:
-    """Получить название группы по её ID"""
+def get_group_id(group_name: str) -> int | None:
+    """Получить ид группы по её названию"""
     conn = get_connection()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT GroupID FROM Groups WHERE GroupName = ?", (group_id,))
+    cursor.execute("SELECT GroupID FROM Groups WHERE GroupName = ?", (group_name,))
     row = cursor.fetchone()
 
     if row:
         return row[0]
     else:
         return None
-
-
-# Получение списка дат пользователя
-def get_user_dates(user_id: int) -> list[str]:
-    """Получить список дат пользователя"""
-    conn = get_connection()
-    cursor = conn.cursor()
-
-    cursor.execute(
-        "SELECT date FROM user_dates WHERE user_id = ?",
-        (user_id,)
-    )
-    return [row[0] for row in cursor.fetchall()]
 
 
 # Проверка наличия даты в расписании
