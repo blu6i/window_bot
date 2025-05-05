@@ -75,7 +75,7 @@ async def callback_back_to_groups(call: types.CallbackQuery, state: FSMContext):
             )
         else:
             await call.message.edit_text(
-                "👥 Ваши группы:\nНажмите на них для удаления",
+                "👥 Ваши группы:\nНажмите на группу для удаления",
                 reply_markup=get_inline_key_list(u_id, "group")
             )
 
