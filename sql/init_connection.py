@@ -29,20 +29,12 @@ def get_connection():
 
 
 def create_tables():
-    """Создание всех таблиц"""
+    """Создание всех таблиц без уровней образования, курсов и предметов"""
     try:
         conn = get_connection()
         cursor = conn.cursor()
 
-        # 1. Уровни образования
-        cursor.execute("""
-        CREATE TABLE IF NOT EXISTS EducationalLevel (
-            LevelID INTEGER PRIMARY KEY AUTOINCREMENT,
-            LevelName TEXT NOT NULL UNIQUE,
-            ShortName TEXT NOT NULL UNIQUE
-        )""")
-
-        # 2. Институты
+        # 1. Институты
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS Institutes (
             InstituteID INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -50,7 +42,7 @@ def create_tables():
             ShortName TEXT NOT NULL UNIQUE
         )""")
 
-        # 3. Факультеты
+        # 2. Факультеты
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS Faculties (
             FacultyID INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -60,7 +52,7 @@ def create_tables():
             FOREIGN KEY (InstituteID) REFERENCES Institutes(InstituteID)
         )""")
 
-        # 4. Специализации
+        # 3. Специализации
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS Specializations (
             SpecializationID INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -70,54 +62,49 @@ def create_tables():
             FOREIGN KEY (FacultyID) REFERENCES Faculties(FacultyID)
         )""")
 
-        # 5. Группы
+        # 4. Группы
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS Groups (
             GroupID INTEGER PRIMARY KEY AUTOINCREMENT,
             GroupName TEXT NOT NULL UNIQUE,
             SpecializationID INTEGER NOT NULL,
-            CourseNumber INTEGER NOT NULL CHECK (CourseNumber BETWEEN 1 AND 6),
-            LevelID INTEGER NOT NULL,
-            FOREIGN KEY (SpecializationID) REFERENCES Specializations(SpecializationID),
-            FOREIGN KEY (LevelID) REFERENCES EducationalLevel(LevelID)
+            FOREIGN KEY (SpecializationID) REFERENCES Specializations(SpecializationID)
         )""")
 
-        # 6. Предметы
-        cursor.execute("""
-        CREATE TABLE IF NOT EXISTS Subjects (
-            SubjectID INTEGER PRIMARY KEY AUTOINCREMENT,
-            SubjectName TEXT NOT NULL UNIQUE
-        )""")
-
-        # 7. Расписание
+        # 5. Расписание (без SubjectID и связи с Subjects)
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS Schedule (
             ScheduleID INTEGER PRIMARY KEY AUTOINCREMENT,
             GroupID INTEGER NOT NULL,
             Date TEXT NOT NULL,
-            Day TEXT NOT NULL,
             Time TEXT NOT NULL,
-            SubjectID INTEGER NOT NULL,
-            FOREIGN KEY (GroupID) REFERENCES Groups(GroupID),
-            FOREIGN KEY (SubjectID) REFERENCES Subjects(SubjectID)
+            FOREIGN KEY (GroupID) REFERENCES Groups(GroupID)
         )""")
 
-        # 8. Данные пользователей
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS user_groups (
-                user_id INTEGER,
-                group_id INTEGER,
-                PRIMARY KEY (user_id, group_id),
-                FOREIGN KEY (group_id) REFERENCES Groups(GroupID)
-            );
-        ''')
-        cursor.execute(''' 
-            CREATE TABLE IF NOT EXISTS user_dates (
-                user_id INTEGER,
-                date TEXT,
-                PRIMARY KEY (user_id, date)
-            );
-        ''')
+        # 6. Пользователи
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS Users (
+            UserID INTEGER PRIMARY KEY
+        )""")
+
+        # 7. Группы пользователей
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS user_groups (
+            UserID INTEGER NOT NULL,
+            GroupID INTEGER NOT NULL,
+            PRIMARY KEY (UserID, GroupID),
+            FOREIGN KEY (UserID) REFERENCES Users(UserID),
+            FOREIGN KEY (GroupID) REFERENCES Groups(GroupID)
+        )""")
+
+        # 8. Даты пользователей
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS user_dates (
+            UserID INTEGER NOT NULL,
+            Date TEXT NOT NULL,
+            PRIMARY KEY (UserID, Date),
+            FOREIGN KEY (UserID) REFERENCES Users(UserID)
+        )""")
 
         conn.commit()
         logger.info('Таблицы созданы с обновленной структурой')
@@ -126,3 +113,4 @@ def create_tables():
         conn.rollback()
         logger.error(f'Ошибка создания таблиц: {str(e)}')
         raise
+
