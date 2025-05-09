@@ -19,7 +19,7 @@ async def show_dates(event: Union[CallbackQuery, Message], state: FSMContext):
     if not u_dates:
         text = "📅 У вас пока нет добавленных дат."
     else:
-        text = "📅 Ваши даты:\n\nФормат ввода даты должен быть: DD, DD.MM или DD.MM.YYYY"
+        text = "📅 Ваши даты:\n\nФормат ввода даты должен быть: DD, DD.\u200BMM или DD.MM.YYYY"
 
     keyboard = get_inline_key_list(u_id, "date")
 
