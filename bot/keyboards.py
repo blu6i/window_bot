@@ -4,7 +4,7 @@ from math import ceil
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from dotenv import load_dotenv
 
-from sql import get_user_groups, get_group_name, get_groups_id, get_user_dates
+from sql import get_user_groups, get_group_name, get_groups_id, get_user_dates, get_user_teachers
 
 load_dotenv('config/.env')
 TOKEN = os.getenv('ADMIN_ID')
@@ -25,6 +25,8 @@ def get_main_menu(u_id: int):
         callback_data="menu_dates"
     )
     keyboard.row(group_button, date_button)
+
+    keyboard.row(InlineKeyboardButton("👨‍🏫 Преподаватели", callback_data="menu_teachers"))
 
     keyboard.row(InlineKeyboardButton("ℹ️ Помощь", callback_data="help"))
 
@@ -58,6 +60,8 @@ def get_inline_key_list(user_id: int, data_type: str, page: int = 0) -> InlineKe
     if data_type == 'date':
         # Получаем дат пользователя
         data_list = get_user_dates(user_id)
+    elif data_type == 'teacher':
+        data_list = get_user_teachers(user_id)
     else:
         # Получаем ID всех групп пользователя
         data_list = get_user_groups(user_id)

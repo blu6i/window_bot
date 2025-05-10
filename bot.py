@@ -19,6 +19,7 @@ dp = Dispatcher(_bot, storage=storage)
 # Регистрируем все хендлеры
 bot.register_add_groups_handlers(dp)
 bot.register_groups_handlers(dp)
+bot.register_teachers_handlers(dp)
 bot.register_date_handlers(dp)
 bot.register_search_handlers(dp)
 bot.register_link_handlers(dp)

@@ -235,51 +235,6 @@ def get_group_hash(group_id: int) -> str:
     except sqlite3.Error as e:
         logger.error(f"Ошибка получения хэша группы: {e}")
         return None
-    finally:
-        cursor.close()
-
-
-def get_teacher_hash(teacher_id: int) -> str:
-    """Получение хэша преподавателя по ID"""
-    conn = get_connection()
-    cursor = conn.cursor()
-    try:
-        cursor.execute("SELECT Hash FROM Teachers WHERE TeacherID = ?", (teacher_id,))
-        result = cursor.fetchone()
-        return result[0] if result else None
-    except sqlite3.Error as e:
-        logger.error(f"Ошибка получения хэша преподавателя: {e}")
-        return None
-    finally:
-        cursor.close()
-
-
-def check_cabinet_exists(cabinet_id: int) -> bool:
-    """Проверка существования кабинета"""
-    conn = get_connection()
-    cursor = conn.cursor()
-    try:
-        cursor.execute("SELECT 1 FROM Cabinets WHERE CabinetID = ?", (cabinet_id,))
-        return cursor.fetchone() is not None
-    except sqlite3.Error as e:
-        logger.error(f"Ошибка проверки кабинета: {e}")
-        return False
-    finally:
-        cursor.close()
-
-
-def check_corpus_exists(corpus: str) -> bool:
-    """Проверка существования корпуса"""
-    conn = get_connection()
-    cursor = conn.cursor()
-    try:
-        cursor.execute("SELECT 1 FROM Cabinets WHERE Corpus = ? LIMIT 1", (corpus,))
-        return cursor.fetchone() is not None
-    except sqlite3.Error as e:
-        logger.error(f"Ошибка проверки корпуса: {e}")
-        return False
-    finally:
-        cursor.close()
 
 
 def main():

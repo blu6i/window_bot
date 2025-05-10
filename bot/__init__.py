@@ -7,3 +7,4 @@ from .handlers.add_groups import register_add_groups_handlers
 from .handlers.list_groups import register_groups_handlers
 from .handlers.list_date import register_date_handlers
 from .handlers.common import register_common_handlers
+from .handlers.list_teacher import register_teachers_handlers

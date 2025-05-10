@@ -19,7 +19,7 @@ def get_connection():
 
 
 def create_tables():
-    """Создание всех таблиц с обновленной структурой"""
+    """Создание всех таблиц с обновленной структурой и LowName полями"""
     try:
         conn = get_connection()
         cursor = conn.cursor()
@@ -29,7 +29,9 @@ def create_tables():
         CREATE TABLE IF NOT EXISTS Institutes (
             InstituteID INTEGER PRIMARY KEY AUTOINCREMENT,
             FullName TEXT NOT NULL UNIQUE,
-            ShortName TEXT NOT NULL UNIQUE
+            ShortName TEXT NOT NULL UNIQUE,
+            FullNameLow TEXT NOT NULL,
+            ShortNameLow TEXT NOT NULL
         )""")
 
         # 2. Факультеты
@@ -39,6 +41,8 @@ def create_tables():
             FacultyName TEXT NOT NULL UNIQUE,
             ShortName TEXT NOT NULL UNIQUE,
             InstituteID INTEGER NOT NULL,
+            FacultyNameLow TEXT NOT NULL,
+            ShortNameLow TEXT NOT NULL,
             FOREIGN KEY (InstituteID) REFERENCES Institutes(InstituteID)
         )""")
 
@@ -49,21 +53,36 @@ def create_tables():
             SpecializationName TEXT NOT NULL,
             ShortName TEXT NOT NULL,
             FacultyID INTEGER NOT NULL,
+            SpecializationNameLow TEXT NOT NULL,
+            ShortNameLow TEXT NOT NULL,
             FOREIGN KEY (FacultyID) REFERENCES Faculties(FacultyID)
         )""")
 
-        # 4. Группы
+        # 4. Кафедры
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS Departament (
+            DepartamentID INTEGER PRIMARY KEY AUTOINCREMENT,
+            DepartamentName TEXT NOT NULL,
+            ShortName TEXT NOT NULL,
+            FacultyID INTEGER NOT NULL,
+            DepartamentNameLow TEXT NOT NULL,
+            ShortNameLow TEXT NOT NULL,
+            FOREIGN KEY (FacultyID) REFERENCES Faculties(FacultyID)
+        )""")
+
+        # 5. Группы
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS Groups (
             GroupID INTEGER PRIMARY KEY AUTOINCREMENT,
             GroupName TEXT NOT NULL UNIQUE,
             SpecializationID INTEGER NOT NULL,
+            GroupNameLow TEXT NOT NULL,
             Hash TEXT,
             ChatID INTEGER,
             FOREIGN KEY (SpecializationID) REFERENCES Specializations(SpecializationID)
         )""")
 
-        # 5. Расписание
+        # 6. Расписание
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS Schedule (
             ScheduleID INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -73,14 +92,14 @@ def create_tables():
             FOREIGN KEY (GroupID) REFERENCES Groups(GroupID)
         )""")
 
-        # 6. Пользователи
+        # 7. Пользователи
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS Users (
             UserID INTEGER PRIMARY KEY AUTOINCREMENT,
             CurrentID INTEGER NOT NULL UNIQUE
         )""")
 
-        # 7. Группы пользователей
+        # 8. Группы пользователей
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS UserGroups (
             UserID INTEGER NOT NULL,
@@ -90,7 +109,7 @@ def create_tables():
             FOREIGN KEY (GroupID) REFERENCES Groups(GroupID)
         )""")
 
-        # 8. Даты пользователей
+        # 9. Даты пользователей
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS UserDates (
             UserID INTEGER NOT NULL,
@@ -99,17 +118,30 @@ def create_tables():
             FOREIGN KEY (UserID) REFERENCES Users(UserID)
         )""")
 
-        # 9. Преподаватели
+        # 10. Преподаватели пользователей
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS UserTeachers (
+            UserID INTEGER NOT NULL,
+            TeacherID INTEGER NOT NULL,
+            PRIMARY KEY (UserID, TeacherID),
+            FOREIGN KEY (UserID) REFERENCES Users(UserID),
+            FOREIGN KEY (TeacherID) REFERENCES Teachers(TeacherID)
+        )""")
+
+        # 11. Преподаватели
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS Teachers (
             TeacherID INTEGER PRIMARY KEY AUTOINCREMENT,
             FullName TEXT NOT NULL UNIQUE,
+            DepartamentID INTEGER NOT NULL,
+            TeacherFullNameLow TEXT NOT NULL,
             Hash TEXT,
             UserID INTEGER,
-            FOREIGN KEY (UserID) REFERENCES Users(UserID)
+            FOREIGN KEY (UserID) REFERENCES Users(UserID),
+            FOREIGN KEY (DepartamentID) REFERENCES Departament(DepartamentID)
         )""")
 
-        # 10. Расписание преподавателй
+        # 12. Расписание преподавателей
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS ScheduleTeacher (
             ScheduleTeacherID INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -119,7 +151,7 @@ def create_tables():
             FOREIGN KEY (TeacherID) REFERENCES Teachers(TeacherID)
         )""")
 
-        # 11. Кабинеты
+        # 13. Кабинеты
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS Cabinets (
                 CabinetID INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -129,7 +161,7 @@ def create_tables():
                 Time TEXT NOT NULL
             )""")
 
-        # 12. Занятые окна
+        # 14. Занятые окна
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS BusyWindows (
                 BusyWindowID INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -150,4 +182,3 @@ def create_tables():
         conn.rollback()
         logger.error(f'Ошибка создания таблиц: {str(e)}')
         raise
-
