@@ -106,46 +106,6 @@ def parse_pdf_to_dataframe(pdf_content: bytes) -> pd.DataFrame:
     return pd.DataFrame(processed_data, columns=["date", "day", "time", "subject"])
 
 
-def add_date_of_week(dataframe: pd.DataFrame, str_date: str) -> pd.DataFrame:
-    """
-    Добавляет столбцы с датой и днём недели в DataFrame расписания.
-
-    Args:
-        dataframe: dataframe с распианием
-        str_date: диапазон дат
-
-    Returns:
-        dataframe: dataframe с добавленным датами/днями
-    """
-    # Инициализация 1 дня расписания
-    day_index = -1
-    date = datetime.strptime(str_date, "%d%m%Y").date()
-    date -= timedelta(days=1)
-
-    date_column = []
-    day_column = []
-
-    last_time = None
-
-    for _, row in dataframe.iterrows():
-        current_time = row["time"]
-
-        # Проверяем, является ли текущее время первым занятием И отличается ли от предыдущего
-        if current_time == FIRST_CLASS_TIME and current_time != last_time:
-            day_index = (day_index + 1) % len(DAYS_OF_WEEK)
-            date += timedelta(days=1)
-
-        date_column.append(date.strftime("%d.%m.%Y"))
-        day_column.append(DAYS_OF_WEEK[day_index])
-        # Обновляем предыдущее значение времени
-        last_time = current_time
-
-    # Добавление столбцов с датой и днем
-    dataframe.insert(0, "day", day_column)
-    dataframe.insert(0, "date", date_column)
-    return dataframe
-
-
 def parser_pdf(group_data: dict) -> DataFrame:
     """
     Обрабатывает расписание для одной группы.
@@ -163,15 +123,6 @@ def parser_pdf(group_data: dict) -> DataFrame:
 
         # Парсинг
         df = parse_pdf_to_dataframe(response.content)
-
-        # Извлекаем дату из URL
-        # date_match = re.search(r'(\d{8}_\d{8})', group_data['schedule_url'])
-        # if not date_match:
-        #    raise ValueError("Не удалось извлечь дату из URL расписания")
-        # start_date = date_match.group(1).split('_')[0]
-
-        # Добавляем даты
-        # df = add_date_of_week(df, start_date)
 
         # Добавляем информацию о группе
         group_match = re.fullmatch(GROUP_PATTERN, group_data['group'])

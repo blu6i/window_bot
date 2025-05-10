@@ -4,6 +4,7 @@ import re
 from datetime import datetime
 
 from sql.init_connection import get_connection
+from utils import logger
 
 PATTERN_GROUP = r"^[а-яА-ЯёЁ]+-\d{4}-\d{2}-\d{2}$"
 
@@ -221,6 +222,64 @@ def is_date_in_schedule(date_str: str) -> bool:
     cursor.execute("SELECT 1 FROM Schedule WHERE Date = ? LIMIT 1", (date_str,))
     result = cursor.fetchone()
     return result is not None
+
+
+def get_group_hash(group_id: int) -> str:
+    """Получение хэша группы по ID"""
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT Hash FROM Groups WHERE GroupID = ?", (group_id,))
+        result = cursor.fetchone()
+        return result[0] if result else None
+    except sqlite3.Error as e:
+        logger.error(f"Ошибка получения хэша группы: {e}")
+        return None
+    finally:
+        cursor.close()
+
+
+def get_teacher_hash(teacher_id: int) -> str:
+    """Получение хэша преподавателя по ID"""
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT Hash FROM Teachers WHERE TeacherID = ?", (teacher_id,))
+        result = cursor.fetchone()
+        return result[0] if result else None
+    except sqlite3.Error as e:
+        logger.error(f"Ошибка получения хэша преподавателя: {e}")
+        return None
+    finally:
+        cursor.close()
+
+
+def check_cabinet_exists(cabinet_id: int) -> bool:
+    """Проверка существования кабинета"""
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT 1 FROM Cabinets WHERE CabinetID = ?", (cabinet_id,))
+        return cursor.fetchone() is not None
+    except sqlite3.Error as e:
+        logger.error(f"Ошибка проверки кабинета: {e}")
+        return False
+    finally:
+        cursor.close()
+
+
+def check_corpus_exists(corpus: str) -> bool:
+    """Проверка существования корпуса"""
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT 1 FROM Cabinets WHERE Corpus = ? LIMIT 1", (corpus,))
+        return cursor.fetchone() is not None
+    except sqlite3.Error as e:
+        logger.error(f"Ошибка проверки корпуса: {e}")
+        return False
+    finally:
+        cursor.close()
 
 
 def main():

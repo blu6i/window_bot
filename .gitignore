@@ -18,7 +18,7 @@ test_venv/
 sql/.search_window.py
 bot/handlers/.groups_and_date.py
 bot/handlers/.main_menu.py
-parser/.teacher
+parser/teacher
 utils/.get_unique_objects.py
 utils/.import_subjects.py
 .update_data.py

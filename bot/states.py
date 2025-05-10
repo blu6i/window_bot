@@ -5,3 +5,4 @@ class MenuStates(StatesGroup):
     GROUP_EDIT = State()
     DATE_EDIT = State()
     LINK_MENU = State()
+    TEACHER_EDIT = State()

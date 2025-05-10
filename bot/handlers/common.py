@@ -3,9 +3,9 @@ from aiogram.dispatcher import FSMContext
 from aiogram.types import ReplyKeyboardRemove
 
 from bot import get_main_menu
-from sql import remove_schedule
+from sql import remove_schedule, remove_schedule_teacher
 from utils import logger
-from parser import groups_web_parse
+from parser import groups_web_parse, parse_schedule_teacher
 
 WELCOME_TEXT = ("Добро пожаловать в бота для поиска свободных окон в расписании групп!\n"
                 "\n"
@@ -27,17 +27,24 @@ WELCOME_TEXT = ("Добро пожаловать в бота для поиска
                 )
 
 LINK = 'https://www.vyatsu.ru/studentu-1/spravochnaya-informatsiya/raspisanie-zanyatiy-dlya-studentov.html'
+LINK_TEACHER = 'https://www.vyatsu.ru/studentu-1/spravochnaya-informatsiya/teacher.html'
 
 
 async def update_db(call: types.CallbackQuery):
     await call.message.answer('⏳ Запуск парсинга...')
     await call.answer()
     try:
-        remove_schedule()
-        groups_web_parse(LINK)
-        await call.message.answer(f'✅ Парсинг завершен')
+        remove_schedule_teacher()
+        parse_schedule_teacher(LINK_TEACHER)
+        await call.message.answer(f'✅ Парсинг расписания преподавателей завершен')
     except Exception as e:
         await call.message.answer(f'⚠️ Ошибка при парсинге\n{e}')
+    #try:
+    #    remove_schedule()
+    #    groups_web_parse(LINK)
+    #    await call.message.answer(f'✅ Парсинг расписания групп завершен')
+    #except Exception as e:
+    #    await call.message.answer(f'⚠️ Ошибка при парсинге\n{e}')
 
 
 async def remove_keyboard(bot, chat_id, msg_id):

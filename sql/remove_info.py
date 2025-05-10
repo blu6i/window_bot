@@ -62,3 +62,12 @@ def remove_schedule():
     cursor.execute("DELETE FROM Schedule")
     conn.commit()
     logger.info("Таблица Schedule очищена")
+
+
+def remove_schedule_teacher():
+    """Удаление всего расписания"""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM ScheduleTeacher")
+    conn.commit()
+    logger.info("Таблица Schedule очищена")

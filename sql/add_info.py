@@ -1,3 +1,5 @@
+import hashlib
+import os
 import sqlite3
 from datetime import datetime
 
@@ -6,6 +8,19 @@ import pandas as pd
 from sql.init_connection import get_connection
 from sql.get_info import get_user_id
 from utils import logger
+
+from dotenv import load_dotenv
+
+load_dotenv('../config/.env')
+
+
+def generate_hash(fullname: str) -> str:
+    """
+    Генерирует хэш на основе полного имени преподавателя и секретного ключа из .env
+    """
+    key = os.getenv('HASH_TOKEN')
+    data_to_hash = key + fullname.strip()
+    return hashlib.sha256(data_to_hash.encode('utf-8')).hexdigest()
 
 
 # Добавление факультета
@@ -371,3 +386,118 @@ def add_user_date(user: int, date: str):
         (user_id, date)
     )
     conn.commit()
+
+
+# Добавление преподавателя
+def add_teachers(df: pd.DataFrame):
+    """
+    Добавляет новых преподавателей в таблицу Teachers на основе DataFrame.
+
+    Args:
+        df (pd.DataFrame): DataFrame с колонкой 'teacher', содержащей имя преподавателя.
+    """
+    conn = get_connection()
+    added_count = 0
+
+    try:
+        cursor = conn.cursor()
+        cursor.execute("BEGIN TRANSACTION")
+
+        # Получаем существующих преподавателей для проверки дубликатов
+        cursor.execute("SELECT FullName FROM Teachers")
+        existing_teachers = {row[0].strip() for row in cursor.fetchall()}
+
+        required_columns = ['teacher']
+
+        # Обрабатываем только нужные колонки
+        teacher_data = df[required_columns].dropna().drop_duplicates()
+
+        for _, row in teacher_data.iterrows():
+            fullname = str(row['teacher']).strip()
+
+            if not fullname:
+                continue
+
+            if fullname in existing_teachers:
+                logger.info(f"Преподаватель '{fullname}' уже существует")
+                continue
+
+            teacher_hash = generate_hash(fullname)
+
+            cursor.execute("""
+                INSERT INTO Teachers (FullName, Hash)
+                VALUES (?, ?)
+            """, (fullname, teacher_hash))
+
+            existing_teachers.add(fullname)
+            added_count += 1
+
+        conn.commit()
+        logger.info(f"Добавлено {added_count} новых преподавателей")
+
+    except Exception as e:
+        conn.rollback()
+        logger.error(f"Ошибка при добавлении преподавателей: {e}")
+
+
+# Добавление расписания преподавателей
+def add_schedule_teacher(df: pd.DataFrame):
+    """
+    Добавляет расписание преподавателей на основе DataFrame.
+    Старые записи НЕ удаляются — предполагается, что это делается отдельно.
+
+    Args:
+        df: DataFrame с данными
+    """
+    conn = get_connection()
+
+    try:
+        cursor = conn.cursor()
+        cursor.execute("BEGIN TRANSACTION")
+
+        # Кэш преподавателей
+        cursor.execute("SELECT TeacherID, FullName FROM Teachers")
+        teacher_cache = {name.strip(): id_ for id_, name in cursor.fetchall()}
+
+        required_columns = ['teacher', 'date', 'time', 'subject']
+
+        schedule_data = df[required_columns].dropna().drop_duplicates()
+        added_count = 0
+        today = datetime.today().date()
+
+        for _, row in schedule_data.iterrows():
+            try:
+                # Проверка на актуальность даты
+                date_str = str(row['date']).strip()
+                row_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+                if row_date < today:
+                    continue  # Пропускаем устаревшие записи
+            except Exception as e:
+                logger.warning(f"Ошибка при обработке даты: {e}")
+                continue
+
+            subject = str(row['subject']).strip()
+            if not subject:
+                continue  # Пропускаем строку без названия предмета
+
+            teacher_name = str(row['teacher']).strip()
+            time = str(row['time']).strip()
+
+            teacher_id = teacher_cache.get(teacher_name)
+            if not teacher_id:
+                logger.warning(f"Преподаватель '{teacher_name}' не найден")
+                continue
+
+            cursor.execute("""
+                INSERT INTO ScheduleTeacher (TeacherID, Date, Time)
+                VALUES (?, ?, ?)
+            """, (teacher_id, date_str, time))
+            added_count += 1
+
+        conn.commit()
+        logger.info(f"Добавлено {added_count} записей в расписание преподавателей")
+
+    except Exception as e:
+        conn.rollback()
+        logger.error(f"Ошибка при добавлении расписания преподавателей: {str(e)}")
+

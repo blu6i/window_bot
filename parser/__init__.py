@@ -1,5 +1,5 @@
-from parser.student.pdf_parser import parser_pdf as groups_pdf_parse
 from parser.student.web_parser import parse_schedule as groups_web_parse
+from .teacher.web_parser_teacher import parse_schedule_teacher
 
 # Импорт утилиты
 from parser.utils.formating_str import format_class
