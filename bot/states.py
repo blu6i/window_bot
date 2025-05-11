@@ -6,3 +6,7 @@ class MenuStates(StatesGroup):
     DATE_EDIT = State()
     LINK_MENU = State()
     TEACHER_EDIT = State()
+    EDIT_WINDOW = State()
+    EDIT_COMMENT = State()
+    EDIT_AUDI = State()
+    MY_MEET_VIEW = State()

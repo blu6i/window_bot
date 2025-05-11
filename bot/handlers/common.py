@@ -39,12 +39,12 @@ async def update_db(call: types.CallbackQuery):
         await call.message.answer(f'✅ Парсинг расписания преподавателей завершен')
     except Exception as e:
         await call.message.answer(f'⚠️ Ошибка при парсинге\n{e}')
-    #try:
-    #    remove_schedule()
-    #    groups_web_parse(LINK)
-    #    await call.message.answer(f'✅ Парсинг расписания групп завершен')
-    #except Exception as e:
-    #    await call.message.answer(f'⚠️ Ошибка при парсинге\n{e}')
+    try:
+        remove_schedule()
+        groups_web_parse(LINK)
+        await call.message.answer(f'✅ Парсинг расписания групп завершен')
+    except Exception as e:
+        await call.message.answer(f'⚠️ Ошибка при парсинге\n{e}')
 
 
 async def remove_keyboard(bot, chat_id, msg_id):

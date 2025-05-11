@@ -3,7 +3,7 @@ from typing import Union
 from aiogram import types, Dispatcher
 from aiogram.dispatcher import FSMContext
 
-from bot.keyboards import get_inline_key_list, get_inline_key_add_groups
+from bot.keyboards import get_inline_key_list, get_inline_key_add_info
 from bot.states import MenuStates
 from sql import add_user_group, get_user_groups, get_group_name, remove_user_group
 from utils import logger
@@ -13,7 +13,7 @@ from utils import logger
 async def callback_add_group(call: types.CallbackQuery, state: FSMContext):
     """Добавление групп"""
     u_id = call.from_user.id
-    group_id = call.data[len("add_group_"):]
+    group_id = call.data[len("add_groups_"):]
     group = get_group_name(group_id)
 
     add_user_group(u_id, group)
@@ -34,7 +34,7 @@ async def callback_del_groups(call: types.CallbackQuery, state: FSMContext):
     page = state_data.get("page_group", 0)
 
     # Обработка удаления группы
-    group_id = call.data[len("add_group_"):]
+    group_id = call.data[len("add_groups_"):]
     group_name = get_group_name(group_id)
     remove_user_group(u_id, group_id)
     text = f"❌ Группа «{group_name}» удалена."
@@ -58,7 +58,7 @@ async def callback_add_all_groups(call: types.CallbackQuery, state: FSMContext):
             add_user_group(u_id, group)
     data = data.get('actual_data')
     # После добавления обновляем сообщение с новой клавиатурой
-    keyboard = get_inline_key_add_groups(u_id, data)
+    keyboard = get_inline_key_add_info(u_id, data, 'groups')
     await call.message.edit_reply_markup(reply_markup=keyboard)
 
 
@@ -116,7 +116,7 @@ async def refresh_add_group_message(message_or_query: Union[types.Message, types
     page = data.get('found_page', 0)
     text = data.get('message', '📚 Выберите группы для добавления:')
     data = data.get('actual_data')
-    keyboard = get_inline_key_add_groups(user_id, data, page)
+    keyboard = get_inline_key_add_info(user_id, data, "groups", page)
     if isinstance(message_or_query, types.Message):
         await message_or_query.answer(f"{text}", reply_markup=keyboard)
     else:
@@ -126,7 +126,7 @@ async def refresh_add_group_message(message_or_query: Union[types.Message, types
 def register_add_groups_handlers(dp: Dispatcher):
     # Добавление одной группы
     dp.register_callback_query_handler(callback_add_group,
-                                       lambda c: c.data.startswith("add_group_"),
+                                       lambda c: c.data.startswith("add_groups_"),
                                        state=MenuStates.GROUP_EDIT)
     # Добавление всех групп
     dp.register_callback_query_handler(callback_add_all_groups,
@@ -134,7 +134,7 @@ def register_add_groups_handlers(dp: Dispatcher):
                                        state=MenuStates.GROUP_EDIT)
     # Отмена добавления
     dp.register_callback_query_handler(callback_del_groups,
-                                       lambda c: c.data.startswith('del_group_'),
+                                       lambda c: c.data.startswith('del_groups_'),
                                        state=MenuStates.GROUP_EDIT)
     # Навигация
     dp.register_callback_query_handler(callback_change_add_page,

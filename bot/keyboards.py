@@ -5,6 +5,7 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from dotenv import load_dotenv
 
 from sql import get_user_groups, get_group_name, get_groups_id, get_user_dates, get_user_teachers
+import sql
 
 load_dotenv('config/.env')
 TOKEN = os.getenv('ADMIN_ID')
@@ -14,7 +15,10 @@ def get_main_menu(u_id: int):
     keyboard = InlineKeyboardMarkup()
 
     # 1-я строка — 1 кнопка
-    keyboard.row(InlineKeyboardButton("🪟 Окна в расписании", callback_data="menu_windows"))
+    if sql.is_teacher_authorized(u_id):
+        keyboard.row(InlineKeyboardButton("🪟 Окна в расписании", callback_data="menu_teacher_window"))
+    else:
+        keyboard.row(InlineKeyboardButton("🪟 Окна в расписании", callback_data="menu_windows"))
 
     group_button = InlineKeyboardButton(
         "👥 Группы",
@@ -27,6 +31,9 @@ def get_main_menu(u_id: int):
     keyboard.row(group_button, date_button)
 
     keyboard.row(InlineKeyboardButton("👨‍🏫 Преподаватели", callback_data="menu_teachers"))
+
+    if sql.is_teacher_authorized(u_id):
+        keyboard.row(InlineKeyboardButton("🪟 Мои встречи", callback_data="list_meet"))
 
     keyboard.row(InlineKeyboardButton("ℹ️ Помощь", callback_data="help"))
 
@@ -72,19 +79,26 @@ def get_inline_key_list(user_id: int, data_type: str, page: int = 0) -> InlineKe
 
     start_i = page * page_size
     end_i = start_i + page_size
-    group_ids_on_page = data_list[start_i:end_i]
+    data_ids_on_page = data_list[start_i:end_i]
 
     keyboard = InlineKeyboardMarkup(row_width=2)
 
     if data_type == 'group':
-        for group_id in group_ids_on_page:
+        for group_id in data_ids_on_page:
             group_name = get_group_name(group_id)
             keyboard.insert(InlineKeyboardButton(
                 text=group_name,
                 callback_data=f'-{group_id}'  # Передаем ID
             ))
+    elif data_type == 'teacher':
+        for teacher in data_ids_on_page:
+            teacher_name = sql.get_teacher_name(teacher)
+            keyboard.insert(InlineKeyboardButton(
+                text=teacher_name,
+                callback_data=f'-{teacher}'  # Передаем ID
+            ))
     else:
-        for item in group_ids_on_page:
+        for item in data_ids_on_page:
             keyboard.insert(InlineKeyboardButton(
                 text=item,
                 callback_data=f'-{item}'  # Передаем ID
@@ -114,45 +128,64 @@ def get_inline_key_list(user_id: int, data_type: str, page: int = 0) -> InlineKe
     return keyboard
 
 
-def get_inline_key_add_groups(user_id: int, data: str, page: int = 0) -> InlineKeyboardMarkup:
+def get_inline_key_add_info(u_id: int, data: str, type_: str, page: int = 0) -> InlineKeyboardMarkup:
     """Генерация клавиатуры выбора групп для добавления, с фильтрацией на лету."""
-
-    # Получаем найденные группы (имена групп)
-    found_groups = get_groups_id(data) or []
-
-    # Получаем ID групп, которые у пользователя уже есть
-    added_groups = get_user_groups(user_id)
+    if type_ == 'groups':
+        # Получаем найденные группы (имена групп)
+        found_info = get_groups_id(data) or []
+        # Получаем ID групп, которые у пользователя уже есть
+        add_info = get_user_groups(u_id)
+    elif type_ == 'teachers':
+        # Получаем найденные группы (имена групп)
+        found_info = []
+        for teacher in sql.get_teachers_sub(data):
+            found_info.append(teacher['id'])
+        # Получаем ID групп, которые у пользователя уже есть
+        add_info = sql.get_user_teachers(u_id)
 
     # Фильтруем найденные группы — берём только те, которых нет у пользователя
-    not_added_groups = []
-    for id_ in found_groups:
-        if id_ not in added_groups:
-            not_added_groups.append(id_)
+    not_added_info = []
+    for id_ in found_info:
+        if id_ not in add_info:
+            not_added_info.append(id_)
 
     page_size = 12
-    max_page = ceil(len(found_groups) / page_size) - 1
+    max_page = ceil(len(found_info) / page_size) - 1
     page = max(0, min(page, max_page))
 
     start_i = page * page_size
     end_i = start_i + page_size
-    items_on_page = found_groups[start_i:end_i]
+    items_on_page = found_info[start_i:end_i]
 
     keyboard = InlineKeyboardMarkup(row_width=2)
 
-    for id_ in items_on_page:
-        if id_ in not_added_groups:
-            keyboard.insert(InlineKeyboardButton(
-                text=f'❌ {get_group_name(id_)}',
-                callback_data=f"add_group_{id_}"
-            ))
-        else:
-            keyboard.insert(InlineKeyboardButton(
-                text=f'✅ {get_group_name(id_)}',
-                callback_data=f"del_group_{id_}"
-            ))
+    if type_ == 'groups':
+        for id_ in items_on_page:
+            if id_ in not_added_info:
+                keyboard.insert(InlineKeyboardButton(
+                    text=f'❌ {get_group_name(id_)}',
+                    callback_data=f"add_{type_}_{id_}"
+                ))
+            else:
+                keyboard.insert(InlineKeyboardButton(
+                    text=f'✅ {get_group_name(id_)}',
+                    callback_data=f"del_{type_}_{id_}"
+                ))
+    elif type_ == 'teachers':
+        for id_ in items_on_page:
+            if id_ in not_added_info:
+                keyboard.insert(InlineKeyboardButton(
+                    text=f'❌ {sql.get_teacher_name(id_)}',
+                    callback_data=f"add_{type_}_{id_}"
+                ))
+            else:
+                keyboard.insert(InlineKeyboardButton(
+                    text=f'✅ {sql.get_teacher_name(id_)}',
+                    callback_data=f"del_{type_}_{id_}"
+                ))
 
-    if not_added_groups:
-        keyboard.add(InlineKeyboardButton("➕ Добавить всё", callback_data="add_all_groups"))
+    if not_added_info:
+        keyboard.add(InlineKeyboardButton("➕ Добавить всё", callback_data=f"add_all_{type_}"))
 
     nav_buttons = []
     if page > 0:
@@ -167,6 +200,6 @@ def get_inline_key_add_groups(user_id: int, data: str, page: int = 0) -> InlineK
     if nav_buttons:
         keyboard.row(*nav_buttons)
 
-    keyboard.add(InlineKeyboardButton("🔙 Назад", callback_data="back_to_groups"))
+    keyboard.add(InlineKeyboardButton("🔙 Назад", callback_data=f"back_to_{type_}"))
 
     return keyboard

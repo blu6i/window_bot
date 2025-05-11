@@ -212,3 +212,11 @@ def add_user_teacher(user: int, teacher_name: str) -> bool:
     )
     conn.commit()
     return True
+
+
+# Обновление поля UserID в Teachers
+def update_teacher_userid(u_id, teacher_id):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("UPDATE Teachers SET UserID = ? WHERE TeacherID = ?", (u_id, teacher_id))
+    conn.commit()

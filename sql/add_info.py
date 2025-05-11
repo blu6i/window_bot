@@ -358,9 +358,9 @@ def add_groups(df: pd.DataFrame):
 
     try:
         faculty_short = str(df.iloc[0, 0]).strip()  # ShortName факультета
-        group_name = str(df.iloc[0, 1]).strip()     # Название группы
+        group_name = str(df.iloc[0, 1]).strip()  # Название группы
         specialization_short = str(df.iloc[0, 2]).strip()  # ShortName специальности
-        institute_id = int(df.iloc[0, 4])            # ID института
+        institute_id = int(df.iloc[0, 4])  # ID института
     except Exception as e:
         logger.warning(f"Ошибка при чтении строки: {e}")
         return
@@ -525,3 +525,18 @@ def add_user_date(user: int, date: str):
         (user_id, date)
     )
     conn.commit()
+
+
+def add_busy_window(current_date, times, group_id, teacher_id, cabinet_id, comment, initiator_teacher_id=None):
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        for time in times:
+            cursor.execute("""
+                INSERT INTO BusyWindows 
+                    (Date, Time, GroupID, TeacherID, CabinetID, Comment, InitiatorTeacherID)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (current_date, time, group_id, teacher_id, cabinet_id, comment, initiator_teacher_id))
+        conn.commit()
+    except Exception as e:
+        logger.warning(f'Проблема при добавлении окна: {e}')

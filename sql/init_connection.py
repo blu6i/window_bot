@@ -167,11 +167,15 @@ def create_tables():
                 BusyWindowID INTEGER PRIMARY KEY AUTOINCREMENT,
                 Date TEXT NOT NULL,
                 Time TEXT NOT NULL,
+                Comment TEXT,
                 GroupID INTEGER,
                 TeacherID INTEGER,
                 CabinetID INTEGER,
+                InitiatorTeacherID INTEGER,
+                IsCompleted INTEGER DEFAULT 0,
                 FOREIGN KEY (GroupID) REFERENCES Groups(GroupID),
                 FOREIGN KEY (TeacherID) REFERENCES Teachers(TeacherID),
+                FOREIGN KEY (InitiatorTeacherID) REFERENCES Teachers(TeacherID),
                 FOREIGN KEY (CabinetID) REFERENCES Cabinets(CabinetID)
             )""")
 

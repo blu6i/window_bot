@@ -237,6 +237,94 @@ def get_group_hash(group_id: int) -> str:
         return None
 
 
+def get_occupied_times_multi(group_ids: list, teacher_ids: list, dates: list) -> dict:
+    conn = get_connection()
+    cursor = conn.cursor()
+    occupied = {date: set() for date in dates}
+
+    try:
+        # Занятые из расписания группы
+        if group_ids:
+            query = """
+                SELECT Date, Time FROM Schedule 
+                WHERE GroupID IN ({}) AND Date IN ({})
+            """.format(','.join('?' * len(group_ids)), ','.join('?' * len(dates)))
+            cursor.execute(query, [*group_ids, *dates])
+            for date, time in cursor.fetchall():
+                occupied[date].add(time)
+
+        # Занятые из расписания преподавателя
+        if teacher_ids:
+            query = """
+                SELECT Date, Time FROM ScheduleTeacher 
+                WHERE TeacherID IN ({}) AND Date IN ({})
+            """.format(','.join('?' * len(teacher_ids)), ','.join('?' * len(dates)))
+            cursor.execute(query, [*teacher_ids, *dates])
+            for date, time in cursor.fetchall():
+                occupied[date].add(time)
+
+        # Общие занятые окна
+        placeholders = []
+        conditions = []
+
+        if group_ids:
+            conditions.append("GroupID IN ({})".format(','.join('?' * len(group_ids))))
+            placeholders.extend(group_ids)
+        if teacher_ids:
+            conditions.append("TeacherID IN ({})".format(','.join('?' * len(teacher_ids))))
+            placeholders.extend(teacher_ids)
+
+        if conditions:
+            where_clause = " OR ".join(conditions)
+            query = f"""
+                SELECT Date, Time FROM BusyWindows 
+                WHERE ({where_clause}) AND Date IN ({','.join('?' * len(dates))})
+            """
+            placeholders.extend(dates)
+            cursor.execute(query, placeholders)
+            for date, time in cursor.fetchall():
+                occupied[date].add(time)
+
+    except Exception as e:
+        logger.warning(f'Ошибка при определения 3 таблиц: {e}')
+
+    return occupied
+
+
+def is_time_still_free(group_id, teacher_id, cabinet_id, date, time):
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        # Формируем запрос с учётом только непустых полей
+        conditions = ["Date = ?", "Time = ?"]
+        params = [date, time]
+
+        or_conditions = []
+        if group_id:
+            or_conditions.append("GroupID = ?")
+            params.append(group_id)
+        if teacher_id:
+            or_conditions.append("TeacherID = ?")
+            params.append(teacher_id)
+        if cabinet_id:
+            or_conditions.append("CabinetID = ?")
+            params.append(cabinet_id)
+
+        if not or_conditions:
+            return True  # Нет ограничений — свободно
+
+        conditions.append(f"({' OR '.join(or_conditions)})")
+
+        query = f"SELECT 1 FROM BusyWindows WHERE {' AND '.join(conditions)}"
+
+        cursor.execute(query, params)
+        return cursor.fetchone() is None
+
+    except Exception as e:
+        logger.warning(f'Ошибка при повторном определении свободного времени: {e}')
+        return False
+
+
 def main():
     for i in range(3):
         search = input()

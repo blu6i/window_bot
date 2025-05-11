@@ -6,7 +6,7 @@ from aiogram.types import CallbackQuery, Message
 
 import sql
 from bot.handlers.common import remove_keyboard
-from bot.keyboards import get_inline_key_list, get_inline_key_add_groups
+from bot.keyboards import get_inline_key_list, get_inline_key_add_info
 from bot.states import MenuStates
 
 
@@ -37,6 +37,7 @@ async def add_group(msg: types.Message, state: FSMContext):
     # Получение ИД последнего сообщения с кнопками
     data = await state.get_data()
     last_msg_id = data.get('last_msg')
+
     # 1. Проверка: пользователь ввел ПОЛНУЮ группу
     if group in sql.get_all_groups():
         if group in u_groups:
@@ -54,7 +55,7 @@ async def add_group(msg: types.Message, state: FSMContext):
         await state.update_data(found_groups=groups)
         await state.update_data(actual_data=group)
         # Генерация клавиатуры добавления групп
-        keyboard = get_inline_key_add_groups(u_id, group)
+        keyboard = get_inline_key_add_info(u_id, group, 'groups')
         await remove_keyboard(msg.bot, msg.chat.id, last_msg_id)
         await msg.answer("📚 Выберите группы для добавления:", reply_markup=keyboard)
     else:
