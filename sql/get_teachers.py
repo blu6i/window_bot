@@ -197,6 +197,17 @@ def get_meet_teacher(teacher_id):
     conn = get_connection()
     cursor = conn.cursor()
     try:
+        # Шаг 1: получаем все Date + Time, где учавствует пользователь
+        cursor.execute("""
+            SELECT DISTINCT Date, Time FROM BusyWindows 
+            WHERE TeacherID = ? OR InitiatorTeacherID = ?
+        """, (teacher_id, teacher_id))
+        date_time_list = cursor.fetchall()
+
+        if not date_time_list:
+            return []
+
+        # Шаг 2: по найденным Date + Time — получаем полную информацию о встречах
         query = """
             SELECT 
                 Date,
@@ -209,12 +220,20 @@ def get_meet_teacher(teacher_id):
                 InitiatorTeacherID,
                 IsCompleted
             FROM BusyWindows
-            WHERE InitiatorTeacherID = ? OR TeacherID = ?
-            GROUP BY Date, Time, InitiatorTeacherID
+            WHERE (Date, Time) IN ({})
+            GROUP BY Date, Time
             ORDER BY Date DESC, Time
-        """
-        cursor.execute(query, (teacher_id, teacher_id))
+        """.format(','.join(['(?, ?)'] * len(date_time_list)))
+
+        # Подготавливаем параметры для запроса
+        params = []
+        for row in date_time_list:
+            params.extend(row)
+
+        # Добавляем teacher_id ещё раз для проверки инициатора
+        cursor.execute(query, params)
         return cursor.fetchall()
+
     except Exception as e:
         logger.warning(f'Ошибка при парсе занятых окон: {e}')
 

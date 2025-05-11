@@ -78,10 +78,10 @@ async def view_date(callback: types.CallbackQuery, state: FSMContext):
     await callback.answer()
 
 
-async def format_meetings_for_state(meetings):
+async def format_meetings_for_state(meetings_raw):
     grouped = {}
 
-    for meeting in meetings:
+    for meeting in meetings_raw:
         date = meeting[0]
         time = meeting[1]
         groups = meeting[2].split(',') if meeting[2] else []
@@ -102,7 +102,7 @@ async def format_meetings_for_state(meetings):
             'cabinet_id': cabinet_id,
             'comment': comment,
             'meeting_id': meeting_id,
-            'initiator_id': initiator_id,
+            'initiator_id': int(initiator_id) if initiator_id else None,
             'is_completed': is_completed
         })
 
@@ -154,14 +154,11 @@ async def show_meeting_details(message: types.Message, state: FSMContext):
     elif is_completed:
         kb.add(types.InlineKeyboardButton("❌ Отметить как не пройденное",
                                           callback_data="mark_not_complete"))
-
     if meeting['initiator_id'] == data['teacher_id']:
         kb.add(types.InlineKeyboardButton("🗑️ Удалить встречу", callback_data="delete_meeting"))
 
     kb.add(types.InlineKeyboardButton("🔁 Редактировать встречу", callback_data="edit_meeting"))
     kb.add(types.InlineKeyboardButton("🔔 Отправить напоминание", callback_data="send_reminder"))
-    kb.add(types.InlineKeyboardButton("🔙 Назад к датам", callback_data="back_to_dates"))
-
     # Навигация по встречам
     if len(meetings) > 1:
         nav_buttons = []
@@ -170,6 +167,7 @@ async def show_meeting_details(message: types.Message, state: FSMContext):
         if idx < len(meetings) - 1:
             nav_buttons.append(types.InlineKeyboardButton("Следующее ➡", callback_data="next_meeting"))
         kb.row(*nav_buttons)
+    kb.add(types.InlineKeyboardButton("🔙 Назад к датам", callback_data="back_to_dates"))
 
     await message.edit_text(text, parse_mode="HTML", reply_markup=kb)
 
