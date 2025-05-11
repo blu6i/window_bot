@@ -33,7 +33,7 @@ def get_main_menu(u_id: int):
     keyboard.row(InlineKeyboardButton("👨‍🏫 Преподаватели", callback_data="menu_teachers"))
 
     if sql.is_teacher_authorized(u_id):
-        keyboard.row(InlineKeyboardButton("🪟 Мои встречи", callback_data="list_meet"))
+        keyboard.row(InlineKeyboardButton("🪟 Мои встречи", callback_data="my_meet"))
 
     keyboard.row(InlineKeyboardButton("ℹ️ Помощь", callback_data="help"))
 

@@ -9,4 +9,5 @@ class MenuStates(StatesGroup):
     EDIT_WINDOW = State()
     EDIT_COMMENT = State()
     EDIT_AUDI = State()
-    MY_MEET_VIEW = State()
+    MY_MEET = State()
+    EDIT_MEET = State()

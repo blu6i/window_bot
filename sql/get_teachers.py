@@ -63,7 +63,7 @@ def get_all_teachers() -> list[str]:
 
 
 def get_teacher_name(teacher_id: int) -> str | None:
-    """Получить название группы по её ID"""
+    """Получить преподавателя по её ID"""
     conn = get_connection()
     cursor = conn.cursor()
 
@@ -168,9 +168,6 @@ def is_check_sub(search_str: str) -> bool:
     return False
 
 
-import sqlite3
-
-
 def is_teacher_authorized(u_id: int) -> bool:
     """
     Проверяет, авторизован ли преподаватель.
@@ -194,3 +191,62 @@ def is_teacher_authorized(u_id: int) -> bool:
         return teacher_record is not None
     except Exception as e:
         logger.warning(f'Ошибка при поиске преподавателя {e}')
+
+
+def get_meet_teacher(teacher_id):
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        query = """
+            SELECT 
+                Date,
+                Time,
+                GROUP_CONCAT(DISTINCT CAST(GroupID AS TEXT)) AS Groups,
+                GROUP_CONCAT(DISTINCT CAST(TeacherID AS TEXT)) AS Teachers,
+                CabinetID,
+                Comment,
+                BusyWindowID,
+                InitiatorTeacherID,
+                IsCompleted
+            FROM BusyWindows
+            WHERE InitiatorTeacherID = ? OR TeacherID = ?
+            GROUP BY Date, Time, InitiatorTeacherID
+            ORDER BY Date DESC, Time
+        """
+        cursor.execute(query, (teacher_id, teacher_id))
+        return cursor.fetchall()
+    except Exception as e:
+        logger.warning(f'Ошибка при парсе занятых окон: {e}')
+
+
+def is_initiator(meeting_id: int, teacher_id: int) -> bool:
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            SELECT 1 FROM BusyWindows
+            WHERE BusyWindowID = ? AND InitiatorTeacherID = ?
+        """, (meeting_id, teacher_id))
+        return cursor.fetchone() is not None
+    except Exception as e:
+        logger.warning(f'Не удалось проверить на инициатора: {e}')
+
+
+def get_teacher_id_tg(tg_id: int) -> int | None:
+    """
+    Получает TeacherID по Telegram ID (CurrentID в таблице Users).
+    Возвращает None, если пользователь не найден или не является преподавателем.
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            SELECT t.TeacherID
+            FROM Teachers t
+            JOIN Users u ON t.UserID = u.UserID
+            WHERE u.CurrentID = ?
+        """, (tg_id,))
+        result = cursor.fetchone()
+        return result[0] if result else None
+    except Exception as e:
+        logger.warning(f'Ошибка при получении ид преподавателя: {e}')

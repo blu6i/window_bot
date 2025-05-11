@@ -220,3 +220,44 @@ def update_teacher_userid(u_id, teacher_id):
     cursor = conn.cursor()
     cursor.execute("UPDATE Teachers SET UserID = ? WHERE TeacherID = ?", (u_id, teacher_id))
     conn.commit()
+
+
+def update_completed(meeting_id: int):
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("UPDATE BusyWindows SET IsCompleted = 1 WHERE BusyWindowID = ?", (meeting_id,))
+        conn.commit()
+        return cursor.rowcount > 0
+    except Exception as e:
+        logger.warning(f'Ошибка при обновлении записи с пройденной встречей: {e}')
+
+
+def update_not_completed(meeting_id: int):
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            UPDATE BusyWindows 
+            SET IsCompleted = 0 
+            WHERE BusyWindowID = ?
+        """, (meeting_id,))
+        conn.commit()
+        return cursor.rowcount > 0
+    except Exception as e:
+        logger.warning(f'Ошибка при обновлении записи с пройденной встречей: {e}')
+
+
+def update_meeting_in_db(meeting_id: int, cabinet_id: int, comment: str):
+    conn = sqlite3.connect('your_database.db')
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            UPDATE BusyWindows 
+            SET CabinetID = ?, Comment = ?
+            WHERE BusyWindowID = ?
+        """, (cabinet_id, comment, meeting_id))
+        conn.commit()
+        return cursor.rowcount > 0
+    except Exception as e:
+        logger.warning(f'Ошибка при обновлении записи: {e}')
