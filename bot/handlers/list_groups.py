@@ -2,7 +2,7 @@ from typing import Union
 
 from aiogram import types, Dispatcher
 from aiogram.dispatcher import FSMContext
-from aiogram.types import CallbackQuery, Message
+from aiogram.types import CallbackQuery, Message, ChatType
 
 import sql
 from bot.handlers.common import remove_keyboard
@@ -118,20 +118,21 @@ async def list_user_groups(call: types.CallbackQuery, state: FSMContext):
 def register_groups_handlers(dp: Dispatcher):
     # Меню групп
     dp.register_callback_query_handler(show_groups,
-                                       lambda c: c.data == "menu_groups",
+                                       lambda c: c.data == "menu_groups" and c.message.chat.type == ChatType.PRIVATE,
                                        state="*")
     dp.register_message_handler(show_groups,
                                 commands=["groups"],
                                 state="*")
     # Навигация
     dp.register_callback_query_handler(list_user_groups,
-                                       lambda c: 'next_page_' in c.data or 'prev_page_' in c.data,
+                                       lambda c: ('next_page_' in c.data or 'prev_page_' in c.data) and c.message.chat.type == ChatType.PRIVATE,
                                        state=MenuStates.GROUP_EDIT)
     # Удаление групп
     dp.register_callback_query_handler(list_user_groups,
-                                       lambda c: c.data.startswith('-') or c.data == "clear_all_group",
+                                       lambda c: (c.data.startswith('-') or c.data == "clear_all_group") and c.message.chat.type == ChatType.PRIVATE,
                                        state=MenuStates.GROUP_EDIT)
     # Добавление групп
     dp.register_message_handler(add_group,
                                 lambda m: not m.text.startswith('/'),
+                                chat_type=ChatType.PRIVATE,
                                 state=MenuStates.GROUP_EDIT)

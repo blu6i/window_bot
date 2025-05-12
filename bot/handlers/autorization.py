@@ -1,4 +1,6 @@
 from aiogram import types, Dispatcher
+from aiogram.types import ChatType
+
 import sql
 
 
@@ -26,5 +28,5 @@ async def authorization_teacher(message: types.Message):
 
 def register_authorization_handlers(dp: Dispatcher):
     dp.register_message_handler(authorization_teacher,
-                                lambda c: c.text.startswith('!код'),
+                                lambda c: c.text.startswith('!код') and c.message.chat.type == ChatType.PRIVATE,
                                 state='*')

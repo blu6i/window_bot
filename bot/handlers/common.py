@@ -1,6 +1,6 @@
 from aiogram import types, Dispatcher
 from aiogram.dispatcher import FSMContext
-from aiogram.types import ReplyKeyboardRemove
+from aiogram.types import ReplyKeyboardRemove, ChatType
 
 from bot import get_main_menu
 from sql import remove_schedule, remove_schedule_teacher
@@ -80,13 +80,14 @@ async def cmd_start(msg: types.Message, state: FSMContext):
 def register_common_handlers(dp: Dispatcher):
     # Возврат в главное меню
     dp.register_callback_query_handler(back_to_main,
-                                       lambda c: c.data == "back_to_menu",
+                                       lambda c: c.data == "back_to_menu" and c.message.chat.type == ChatType.PRIVATE,
                                        state="*")
     # Обработка команды /start
     dp.register_message_handler(cmd_start,
                                 commands=["start"],
+                                chat_type=ChatType.PRIVATE,
                                 state="*")
     # Запуск парсера
     dp.register_callback_query_handler(update_db,
-                                       lambda c: c.data == "refresh_schedule",
+                                       lambda c: c.data == "refresh_schedule" and c.message.chat.type == ChatType.PRIVATE,
                                        state='*')

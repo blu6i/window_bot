@@ -2,6 +2,7 @@ from typing import Union
 
 from aiogram import types, Dispatcher
 from aiogram.dispatcher import FSMContext
+from aiogram.types import ChatType
 
 from bot.keyboards import get_inline_key_list, get_inline_key_add_info
 from bot.states import MenuStates
@@ -126,21 +127,21 @@ async def refresh_add_group_message(message_or_query: Union[types.Message, types
 def register_add_groups_handlers(dp: Dispatcher):
     # Добавление одной группы
     dp.register_callback_query_handler(callback_add_group,
-                                       lambda c: c.data.startswith("add_groups_"),
+                                       lambda c: c.data.startswith("add_groups_") and c.message.chat.type == ChatType.PRIVATE,
                                        state=MenuStates.GROUP_EDIT)
     # Добавление всех групп
     dp.register_callback_query_handler(callback_add_all_groups,
-                                       lambda c: c.data == "add_all_groups",
+                                       lambda c: c.data == "add_all_groups" and c.message.chat.type == ChatType.PRIVATE,
                                        state=MenuStates.GROUP_EDIT)
     # Отмена добавления
     dp.register_callback_query_handler(callback_del_groups,
-                                       lambda c: c.data.startswith('del_groups_'),
+                                       lambda c: c.data.startswith('del_groups_') and c.message.chat.type == ChatType.PRIVATE,
                                        state=MenuStates.GROUP_EDIT)
     # Навигация
     dp.register_callback_query_handler(callback_change_add_page,
-                                       lambda c: "prev_page_add_" in c.data or "next_page_add_" in c.data,
+                                       lambda c: "prev_page_add_" in c.data or "next_page_add_" in c.data and c.message.chat.type == ChatType.PRIVATE,
                                        state=MenuStates.GROUP_EDIT)
     # Возврат в меню групп
     dp.register_callback_query_handler(callback_back_to_groups,
-                                       lambda c: c.data == "back_to_groups",
+                                       lambda c: c.data == "back_to_groups" and c.message.chat.type == ChatType.PRIVATE,
                                        state=MenuStates.GROUP_EDIT)

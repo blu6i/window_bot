@@ -2,7 +2,7 @@ from typing import Union
 
 from aiogram import Dispatcher
 from aiogram.dispatcher import FSMContext
-from aiogram.types import CallbackQuery, Message
+from aiogram.types import CallbackQuery, Message, ChatType
 
 from bot.keyboards import get_main_menu
 from sql import get_connection, get_user_groups, get_user_dates, get_group_name
@@ -112,11 +112,12 @@ def register_search_handlers(dp: Dispatcher):
     # Вывод окон
     dp.register_callback_query_handler(
         search_window_handler,
-        lambda c: c.data == "menu_windows",
+        lambda c: c.data == "menu_windows" and c.message.chat.type == ChatType.PRIVATE,
         state="*"
     )
     dp.register_message_handler(
         search_window_handler,
+        chat_type=ChatType.PRIVATE,
         commands=["windows"],
         state="*"
     )

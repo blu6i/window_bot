@@ -2,7 +2,7 @@ from typing import Union
 
 from aiogram import types, Dispatcher
 from aiogram.dispatcher import FSMContext
-from aiogram.types import CallbackQuery, Message
+from aiogram.types import CallbackQuery, Message, ChatType
 
 import sql
 from bot import get_inline_key_list, MenuStates
@@ -132,20 +132,21 @@ async def refresh_teachers_message(msg: types.Message, state: FSMContext, user_i
 def register_teachers_handlers(dp: Dispatcher):
     # Меню групп
     dp.register_callback_query_handler(show_teachers,
-                                       lambda c: c.data == "menu_teachers",
+                                       lambda c: c.data == "menu_teachers" and c.message.chat.type == ChatType.PRIVATE,
                                        state="*")
     dp.register_message_handler(show_teachers,
                                 commands=["groups"],
                                 state="*")
     # Навигация
     dp.register_callback_query_handler(list_user_teachers,
-                                       lambda c: 'next_page_' in c.data or 'prev_page_' in c.data,
+                                       lambda c: ('next_page_' in c.data or 'prev_page_' in c.data) and c.message.chat.type == ChatType.PRIVATE,
                                        state=MenuStates.TEACHER_EDIT)
     # Удаление групп
     dp.register_callback_query_handler(list_user_teachers,
-                                       lambda c: c.data.startswith('-') or c.data == "clear_all_teacher",
+                                       lambda c: (c.data.startswith('-') or c.data == "clear_all_teacher") and c.message.chat.type == ChatType.PRIVATE,
                                        state=MenuStates.TEACHER_EDIT)
     # Добавление групп
     dp.register_message_handler(add_teacher,
                                 lambda m: not m.text.startswith('/'),
+                                chat_type=ChatType.PRIVATE,
                                 state=MenuStates.TEACHER_EDIT)

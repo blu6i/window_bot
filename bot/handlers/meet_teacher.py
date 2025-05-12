@@ -3,7 +3,7 @@ from datetime import datetime
 
 from aiogram import types, Dispatcher
 from aiogram.dispatcher import FSMContext
-from aiogram.types import CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, ChatType
 
 import sql
 from bot import MenuStates
@@ -545,57 +545,59 @@ async def confirm_changes(callback_query: types.CallbackQuery, state: FSMContext
 def register_edit_meet_handlers(dp: Dispatcher):
     # Вывод меню со ссылками
     dp.register_callback_query_handler(confirm_changes,
-                                       lambda c: c.data == "confirm_changes",
+                                       lambda c: c.data == "confirm_changes" and c.message.chat.type == ChatType.PRIVATE,
                                        state=MenuStates.EDIT_MEET)
     dp.register_message_handler(process_comment_input,
                                 state=MenuStates.EDIT_MEET_COMMENT,
+                                chat_type=ChatType.PRIVATE,
                                 content_types=types.ContentTypes.TEXT)
     dp.register_callback_query_handler(enter_edit_comment,
-                                       lambda c: c.data == "edit_comment",
+                                       lambda c: c.data == "edit_comment" and c.message.chat.type == ChatType.PRIVATE,
                                        state=MenuStates.EDIT_MEET)
     dp.register_callback_query_handler(back_to_editor_from_room,
-                                       lambda c: c.data == "back_to_editor",
+                                       lambda c: c.data == "back_to_editor" and c.message.chat.type == ChatType.PRIVATE,
                                        state=[MenuStates.EDIT_MEET_ROOM, MenuStates.EDIT_MEET_DATETIME,
                                               MenuStates.EDIT_MEET_COMMENT])
     dp.register_message_handler(process_room_input,
                                 state=MenuStates.EDIT_MEET_ROOM,
+                                chat_type=ChatType.PRIVATE,
                                 content_types=types.ContentTypes.TEXT)
     dp.register_callback_query_handler(enter_edit_room,
-                                       lambda c: c.data == "edit_room",
+                                       lambda c: c.data == "edit_room" and c.message.chat.type == ChatType.PRIVATE,
                                        state=MenuStates.EDIT_MEET)
     dp.register_callback_query_handler(confirm_time_selection,
-                                       lambda c: c.data == "confirm",
+                                       lambda c: c.data == "confirm" and c.message.chat.type == ChatType.PRIVATE,
                                        state=MenuStates.EDIT_MEET_DATETIME)
     dp.register_callback_query_handler(toggle_time,
-                                       lambda c: c.data.startswith("toggle_time"),
+                                       lambda c: c.data.startswith("toggle_time") and c.message.chat.type == ChatType.PRIVATE,
                                        state=MenuStates.EDIT_MEET_DATETIME)
     dp.register_callback_query_handler(change_date_page,
-                                       lambda c: c.data.startswith("change_date_page"),
+                                       lambda c: c.data.startswith("change_date_page") and c.message.chat.type == ChatType.PRIVATE,
                                        state=[MenuStates.EDIT_MEET_DATETIME, MenuStates.EDIT_MEET])
     dp.register_callback_query_handler(cancel_edit_meeting,
-                                       lambda c: c.data == 'cancel_changes',
+                                       lambda c: c.data == 'cancel_changes' and c.message.chat.type == ChatType.PRIVATE,
                                        state=MenuStates.EDIT_MEET)
     dp.register_callback_query_handler(start_edit_meeting,
-                                       lambda c: c.data == 'edit_meeting',
+                                       lambda c: c.data == 'edit_meeting' and c.message.chat.type == ChatType.PRIVATE,
                                        state=MenuStates.MY_MEET)
     dp.register_callback_query_handler(my_meetings_menu,
-                                       lambda c: c.data in ["my_meet", "back_to_dates"],
+                                       lambda c: c.data in ["my_meet", "back_to_dates"] and c.message.chat.type == ChatType.PRIVATE,
                                        state="*")
     dp.register_callback_query_handler(view_date,
-                                       lambda c: c.data.startswith('view_date_'),
+                                       lambda c: c.data.startswith('view_date_') and c.message.chat.type == ChatType.PRIVATE,
                                        state=MenuStates.MY_MEET)
     dp.register_callback_query_handler(navigate_meetings,
-                                       lambda c: c.data in ["prev_meeting", "next_meeting"],
+                                       lambda c: c.data in ["prev_meeting", "next_meeting"] and c.message.chat.type == ChatType.PRIVATE,
                                        state=MenuStates.MY_MEET)
     dp.register_callback_query_handler(delete_meeting,
-                                       lambda c: c.data == 'delete_meeting',
+                                       lambda c: c.data == 'delete_meeting' and c.message.chat.type == ChatType.PRIVATE,
                                        state=MenuStates.MY_MEET)
     dp.register_callback_query_handler(mark_complete,
-                                       lambda c: c.data == 'mark_complete',
+                                       lambda c: c.data == 'mark_complete' and c.message.chat.type == ChatType.PRIVATE,
                                        state=MenuStates.MY_MEET)
     dp.register_callback_query_handler(mark_not_complete,
-                                       lambda c: c.data == 'mark_not_complete',
+                                       lambda c: c.data == 'mark_not_complete' and c.message.chat.type == ChatType.PRIVATE,
                                        state=MenuStates.MY_MEET)
     dp.register_callback_query_handler(send_reminder,
-                                       lambda c: c.data == 'send_reminder',
+                                       lambda c: c.data == 'send_reminder' and c.message.chat.type == ChatType.PRIVATE,
                                        state=MenuStates.MY_MEET)

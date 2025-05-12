@@ -1,5 +1,6 @@
 from aiogram import types, Dispatcher
 from aiogram.dispatcher import FSMContext
+from aiogram.types import ChatType
 
 from bot import MenuStates, get_menu_link
 
@@ -14,5 +15,5 @@ async def show_links(call: types.CallbackQuery, state: FSMContext):
 def register_link_handlers(dp: Dispatcher):
     # Вывод меню со ссылками
     dp.register_callback_query_handler(show_links,
-                                       lambda c: c.data == "menu_links",
+                                       lambda c: c.data == "menu_links" and c.message.chat.type == ChatType.PRIVATE,
                                        state="*")

@@ -3,7 +3,7 @@ from typing import Union
 
 from aiogram import types, Dispatcher
 from aiogram.dispatcher import FSMContext
-from aiogram.types import CallbackQuery, Message
+from aiogram.types import CallbackQuery, Message, ChatType
 
 from bot.keyboards import get_inline_key_list
 from bot.states import MenuStates
@@ -183,16 +183,18 @@ def date_format_db(text: str) -> str:
 def register_date_handlers(dp: Dispatcher):
     # Меню с датами
     dp.register_callback_query_handler(show_dates,
-                                       lambda c: c.data == 'menu_dates',
+                                       lambda c: c.data == 'menu_dates' and c.message.chat.type == ChatType.PRIVATE,
                                        state="*")
     dp.register_message_handler(show_dates,
                                 commands=['dates'],
+                                chat_type=ChatType.PRIVATE,
                                 state="*")
     # Добавление даты
     dp.register_message_handler(add_date,
                                 lambda m: not m.text.startswith('/'),
+                                chat_type=ChatType.PRIVATE,
                                 state=MenuStates.DATE_EDIT)
     # Удаление даты
     dp.register_callback_query_handler(del_date,
-                                       lambda c: c.data.startswith("-") or c.data == 'clear_all_date',
+                                       lambda c: (c.data.startswith("-") or c.data == 'clear_all_date') and c.message.chat.type == ChatType.PRIVATE,
                                        state=MenuStates.DATE_EDIT)

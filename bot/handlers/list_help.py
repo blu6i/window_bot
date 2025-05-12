@@ -2,7 +2,7 @@ from typing import Union
 
 from aiogram import Dispatcher
 from aiogram.dispatcher import FSMContext
-from aiogram.types import CallbackQuery, Message
+from aiogram.types import CallbackQuery, Message, ChatType
 
 from bot import get_main_menu
 
@@ -74,8 +74,9 @@ def register_help_handlers(dp: Dispatcher):
     # Вывод помощи через команду (!Переделать)
     dp.register_message_handler(send_help,
                                 commands=["help"],
+                                chat_type=ChatType.PRIVATE,
                                 state='*')
     # Вывод помощи
     dp.register_callback_query_handler(send_help,
-                                       lambda c: c.data == "help",
+                                       lambda c: c.data == "help" and c.message.chat.type == ChatType.PRIVATE,
                                        state='*')

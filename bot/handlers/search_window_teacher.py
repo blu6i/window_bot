@@ -2,7 +2,7 @@ from typing import Union
 
 from aiogram import types, Dispatcher
 from aiogram.dispatcher import FSMContext
-from aiogram.types import CallbackQuery, Message
+from aiogram.types import CallbackQuery, Message, ChatType
 from aiogram.utils.exceptions import MessageNotModified
 
 import sql
@@ -384,53 +384,54 @@ async def back_to_edit_menu(call: types.CallbackQuery, state: FSMContext):
 
 def register_windows_list_handlers(dp: Dispatcher):
     dp.register_callback_query_handler(send_free_windows_menu,
-                                       lambda c: c.data == 'menu_teacher_window',
+                                       lambda c: c.data == 'menu_teacher_window' and c.message.chat.type == ChatType.PRIVATE,
                                        state='*')
 
     dp.register_callback_query_handler(
         handle_add_time,
-        lambda c: c.data.startswith('add_'),
+        lambda c: c.data.startswith('add_') and c.message.chat.type == ChatType.PRIVATE,
         state=MenuStates.EDIT_WINDOW
     )
 
     dp.register_callback_query_handler(
         handle_remove_time,
-        lambda c: c.data.startswith('del_'),
+        lambda c: c.data.startswith('del_') and c.message.chat.type == ChatType.PRIVATE,
         state=MenuStates.EDIT_WINDOW
     )
 
     dp.register_callback_query_handler(
         handle_pagination,
-        lambda c: c.data in ['prev_page', 'next_page'],
+        lambda c: c.data in ['prev_page', 'next_page'] and c.message.chat.type == ChatType.PRIVATE,
         state=MenuStates.EDIT_WINDOW
     )
 
     dp.register_callback_query_handler(confirm_selected_time,
-                                       lambda c: c.data == 'confirm_time',
+                                       lambda c: c.data == 'confirm_time' and c.message.chat.type == ChatType.PRIVATE,
                                        state=MenuStates.EDIT_WINDOW)
 
     dp.register_callback_query_handler(edit_cabinet,
-                                       lambda c: c.data == 'edit_audi',
+                                       lambda c: c.data == 'edit_audi' and c.message.chat.type == ChatType.PRIVATE,
                                        state=MenuStates.EDIT_WINDOW)
     dp.register_callback_query_handler(edit_comment,
-                                       lambda c: c.data == 'edit_comment',
+                                       lambda c: c.data == 'edit_comment' and c.message.chat.type == ChatType.PRIVATE,
                                        state=MenuStates.EDIT_WINDOW)
 
     dp.register_message_handler(save_comment,
+                                chat_type=ChatType.PRIVATE,
                                 state=MenuStates.EDIT_COMMENT)
 
     dp.register_callback_query_handler(finalize_selection,
-                                       lambda c: c.data == 'finalize',
+                                       lambda c: c.data == 'finalize' and c.message.chat.type == ChatType.PRIVATE,
                                        state=MenuStates.EDIT_WINDOW)
 
     dp.register_callback_query_handler(save_final_data,
-                                       lambda c: c.data == 'save_final',
+                                       lambda c: c.data == 'save_final' and c.message.chat.type == ChatType.PRIVATE,
                                        state=MenuStates.EDIT_WINDOW)
 
     dp.register_callback_query_handler(back_to_edit_menu,
-                                       lambda c: c.data == 'back_to_edit_menu',
+                                       lambda c: c.data == 'back_to_edit_menu' and c.message.chat.type == ChatType.PRIVATE,
                                        state=[MenuStates.EDIT_AUDI, MenuStates.EDIT_COMMENT, MenuStates.EDIT_WINDOW])
 
     dp.register_callback_query_handler(send_free_windows_menu,
-                                       lambda c: c.data == 'back_to_window',
+                                       lambda c: c.data == 'back_to_window' and c.message.chat.type == ChatType.PRIVATE,
                                        state=MenuStates.EDIT_WINDOW)
