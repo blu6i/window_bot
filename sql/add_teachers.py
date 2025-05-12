@@ -261,3 +261,25 @@ def update_meeting_in_db(meeting_id: int, cabinet_id: int, comment: str):
         return cursor.rowcount > 0
     except Exception as e:
         logger.warning(f'Ошибка при обновлении записи: {e}')
+
+
+def update_meeting_entry(initiator_id: int, old_date: str, old_time: str, updated_fields: dict):
+    if not updated_fields:
+        return  # ничего обновлять
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    set_clause = ", ".join(f"{key} = ?" for key in updated_fields)
+    values = list(updated_fields.values())
+
+    # фильтрация по инициатору, дате и времени
+    values.extend([initiator_id, old_date, old_time])
+    print(values)
+    query = f"""
+        UPDATE BusyWindows
+        SET {set_clause}
+        WHERE InitiatorTeacherID = ? AND Date = ? AND Time = ?
+    """
+    cursor.execute(query, values)
+    conn.commit()
+

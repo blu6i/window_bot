@@ -203,3 +203,50 @@ def get_inline_key_add_info(u_id: int, data: str, type_: str, page: int = 0) -> 
     keyboard.add(InlineKeyboardButton("🔙 Назад", callback_data=f"back_to_{type_}"))
 
     return keyboard
+
+
+def get_edit_meeting_menu():
+    keyboard = InlineKeyboardMarkup(row_width=1)
+    keyboard.add(
+        InlineKeyboardButton("✏️ Редактировать дату и время", callback_data="change_date_page"),
+        InlineKeyboardButton("🏫 Редактировать аудиторию", callback_data="edit_room"),
+        InlineKeyboardButton("💬 Редактировать комментарий", callback_data="edit_comment"),
+        InlineKeyboardButton("✅ Подтвердить изменения", callback_data="confirm_changes"),
+        InlineKeyboardButton("❌ Отменить изменения", callback_data="cancel_changes")
+    )
+    return keyboard
+
+
+def get_time_selection_keyboard(
+    date: str,
+    times: list,
+    selected_times: list,
+    page: int,
+    total_pages: int
+):
+    keyboard = InlineKeyboardMarkup(row_width=2)
+
+    for time in times:
+        is_selected = (date, time) in selected_times
+        text = f"{'✅' if is_selected else ''}{time}"
+        callback_data = f"toggle_time|{date}|{time}"
+        keyboard.insert(InlineKeyboardButton(text=text, callback_data=callback_data))
+
+    # Кнопки листания страниц
+    navigation_buttons = []
+    if page > 0:
+        navigation_buttons.append(InlineKeyboardButton("⬅", callback_data="change_date_page|prev"))
+    if page < total_pages - 1:
+        navigation_buttons.append(InlineKeyboardButton("➡", callback_data="change_date_page|next"))
+
+    if navigation_buttons:
+        keyboard.row(*navigation_buttons)
+
+    # Кнопки управления
+    keyboard.add(
+        InlineKeyboardButton("🔙 Назад", callback_data="back_to_editor"),
+        InlineKeyboardButton("✅ Подтвердить", callback_data="confirm")
+    )
+    return keyboard
+
+

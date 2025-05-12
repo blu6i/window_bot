@@ -11,3 +11,6 @@ class MenuStates(StatesGroup):
     EDIT_AUDI = State()
     MY_MEET = State()
     EDIT_MEET = State()
+    EDIT_MEET_DATETIME = State()
+    EDIT_MEET_ROOM = State()
+    EDIT_MEET_COMMENT = State()
