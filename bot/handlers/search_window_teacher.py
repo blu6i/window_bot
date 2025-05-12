@@ -1,12 +1,14 @@
+import re
 from typing import Union
 
 from aiogram import types, Dispatcher
 from aiogram.dispatcher import FSMContext
-from aiogram.types import CallbackQuery, Message, ChatType
+from aiogram.types import CallbackQuery, Message, ChatType, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.utils.exceptions import MessageNotModified
 
 import sql
 from bot import MenuStates, get_main_menu
+from bot.handlers.common import notify_mp
 
 # Предопределённые временные интервалы
 PAIR_TIMES = [
@@ -222,33 +224,49 @@ async def show_edit_menu(event: Union[CallbackQuery, Message], state: FSMContext
         await event.answer(text, reply_markup=kb)
 
 
-async def edit_cabinet(call: types.CallbackQuery, state: FSMContext):
-    """Получаем список корпусов из БД"""
+async def edit_cabinet(callback_query: types.CallbackQuery, state: FSMContext):
     try:
-        # buildings = get_all_buildings()  # должна возвращать список, например: ['А', 'Б', 'В']
+        data = await state.get_data()
+        current_room = data.get("cabinet", "не указана")
 
-        kb = types.InlineKeyboardMarkup(row_width=2)
-
-        # Кнопки корпусов
-        # for building in buildings:
-        #   kb.add(types.InlineKeyboardButton(f"Корпус {building}", callback_data=f"building_{building}"))
-
-        # Дополнительные опции
-        kb.add(types.InlineKeyboardButton("Назад", callback_data="back_to_edit_menu"))
-
-        await call.message.edit_text(
-            "🏫 Выберите корпус или введите аудиторию вручную: (Заглушка для выбора ауодитории)", reply_markup=kb)
         await MenuStates.EDIT_AUDI.set()
+        await callback_query.message.edit_text(
+            f"Текущая аудитория: {current_room}\n\nВведите новую аудиторию:",
+            reply_markup=InlineKeyboardMarkup().add(
+                InlineKeyboardButton("🔙 Назад", callback_data="back_to_edit_menu")
+            )
+        )
     finally:
-        await call.answer()
+        await callback_query.answer()
 
 
-async def edit_comment(call: types.CallbackQuery):
+async def process_edit_cabinet(message: types.Message, state: FSMContext):
+    cabinet = message.text.strip()
+    if not re.match(r"^\d{1,2}-\d{3}[а-яa-z_]?$", cabinet, re.IGNORECASE):
+        await message.answer("❌ Неверный формат аудитории. Пример: 11-213, 1-003_, 5-312а")
+        return
+
+    await state.update_data(cabinet=cabinet)
+
+    await message.answer(
+        f"✅ Аудитория изменена на: {cabinet}\n\nВведите другую или нажмите 'Назад' для возврата:",
+        reply_markup=InlineKeyboardMarkup().add(
+            InlineKeyboardButton("🔙 Назад", callback_data="back_to_edit_menu")
+        )
+    )
+
+
+async def edit_comment(call: types.CallbackQuery, state: FSMContext):
     """Выбор комментария"""
     try:
+        data = await state.get_data()
+        comment = data.get("comment", "не указана")
         kb = types.InlineKeyboardMarkup(row_width=1)
         kb.add(types.InlineKeyboardButton("Назад", callback_data="back_to_edit_menu"))
-        await call.message.edit_text("Введите комментарий:", reply_markup=kb)
+        if comment:
+            await call.message.edit_text(f"Ваш комментарий:\n{comment}\n\nВведите новый комментарий:", reply_markup=kb)
+        else:
+            await call.message.edit_text("Введите комментарий:", reply_markup=kb)
         await MenuStates.EDIT_COMMENT.set()
     finally:
         await call.answer()
@@ -256,10 +274,17 @@ async def edit_comment(call: types.CallbackQuery):
 
 async def save_comment(message: types.Message, state: FSMContext):
     """Сохранение комментария"""
+    comment = message.text.strip()
     async with state.proxy() as data:
-        data['comment'] = message.text
-    await show_edit_menu(message, state)
-    await MenuStates.EDIT_WINDOW.set()
+        data['comment'] = comment
+    kb = types.InlineKeyboardMarkup(row_width=1)
+    kb.add(types.InlineKeyboardButton("Назад", callback_data="back_to_edit_menu"))
+    await message.answer(
+        f"✅ Комментарий изменен\n\nВведите другой комментарий или нажмите 'Назад' для возврата:",
+        reply_markup=InlineKeyboardMarkup().add(
+            InlineKeyboardButton("🔙 Назад", callback_data="back_to_edit_menu")
+        )
+    )
 
 
 async def finalize_selection(call: types.CallbackQuery, state: FSMContext):
@@ -296,19 +321,10 @@ def generate_summary(data: dict) -> str:
     current_date = data['dates'][data['current_page']]
     times = list(data['selected'][current_date].keys())
 
-    cabinet = data.get('cabinet')
+    cabinet = data.get('cabinet', '-')
     comment = data.get('comment', '-')
     group_ids = data.get('group_ids', [])
     teacher_ids = data.get('teacher_ids', [])
-
-    # Формируем строку с аудиторией
-    if cabinet:
-        if 'manual_input' in cabinet:
-            cabinet_str = cabinet['manual_input']
-        else:
-            cabinet_str = f"{cabinet['building']}-{cabinet['room']}"
-    else:
-        cabinet_str = "-"
 
     # Формируем строку с группами и преподавателями
     groups_str = '-'
@@ -329,7 +345,7 @@ def generate_summary(data: dict) -> str:
         "📌 Предварительный просмотр:\n\n"
         f"📅 Дата:\n{current_date}\n"
         f"⏰ Время:\n{times_str}\n"
-        f"🏫 Аудитория:\n{cabinet_str}\n"
+        f"🏫 Аудитория:\n{cabinet}\n"
         f"🧑‍🏫 Преподаватель(и):\n{teachers_str}\n"
         f"👥 Группа(ы):\n{groups_str}\n"
         f"💬 Комментарий:\n{comment}"
@@ -355,6 +371,7 @@ async def save_final_data(call: types.CallbackQuery, state: FSMContext):
             groups = group_ids if group_ids else [None]
             teachers = teacher_ids if teacher_ids else [None]
 
+        # Добавление записи в таблицу
         for group_id in groups:
             for teacher_id in teachers:
                 sql.add_busy_window(
@@ -367,8 +384,52 @@ async def save_final_data(call: types.CallbackQuery, state: FSMContext):
                     initiator_teacher_id=initiator_teacher_id
                 )
 
-        await call.message.edit_text("✅ Мероприятие(я) успешно запланировано(ы)!")
+        group_name = ""
+        if groups:
+            for group in groups:
+                group_name += f"\n• {sql.get_group_name(group)}"
+        teacher_name = ""
+        if teachers:
+            for teacher in teachers:
+                teacher_name += f"\n• {sql.get_teacher_name(teacher)}"
+
+        text = (
+            f"🔔 Запланирована новая встреча:\n"
+            f"📅 Дата:\n{current_date}\n"
+            f"⏰ Время:\n{', '.join(times)}\n\n"
+            f"🏫 Аудитория:\n{cabinet_id or 'Не указана'}\n\n"
+            f"👥 Группы:{group_name}\n"
+            f"👩🏻‍🏫 Преподаватели:{teacher_name}\n\n"
+            f"💬 Комментарий:\n{comment or 'Не указан'}"
+        )
+
+        # Оповещение участников
+        unnotified_groups, unnotified_teachers = await notify_mp(group_ids, teacher_ids, text)
+
+        # Сообщение об успешном сохранении
+        await call.message.edit_text("✅ Мероприятие(я) успешно запланировано(ы)! Участники оповещены.")
+
+        # Обратная связь пользователю
+        if not unnotified_groups and not unnotified_teachers:
+            await call.message.answer("📬 Уведомление успешно отправлено.")
+        else:
+            # Формируем сообщение о тех, кто не был уведомлен
+            not_notified_message = "❗️ Не удалось отправить уведомления следующим участникам:\n"
+            if unnotified_groups:
+                not_notified_message += f"Группы без чатов:"
+                for group in unnotified_groups:
+                    not_notified_message += f"\n• {sql.get_group_name(group)}"
+            if unnotified_teachers:
+                not_notified_message += f"\nПреподаватели без TG ID:"
+                for teacher in unnotified_teachers:
+                    not_notified_message += f"\n• {sql.get_teacher_name(teacher)}"
+
+            await call.message.answer(not_notified_message)
+
         await state.finish()
+        sent = await call.message.answer("🏠 Главное меню\n\nВыберите нужный раздел",
+                                         reply_markup=get_main_menu(call.from_user.id))
+        await state.update_data(last_msg=sent.message_id)
     finally:
         await call.answer()
 
@@ -383,6 +444,10 @@ async def back_to_edit_menu(call: types.CallbackQuery, state: FSMContext):
 
 
 def register_windows_list_handlers(dp: Dispatcher):
+    dp.register_message_handler(process_edit_cabinet,
+                                state=MenuStates.EDIT_AUDI,
+                                chat_type=ChatType.PRIVATE,
+                                content_types=types.ContentTypes.TEXT)
     dp.register_callback_query_handler(send_free_windows_menu,
                                        lambda c: c.data == 'menu_teacher_window' and c.message.chat.type == ChatType.PRIVATE,
                                        state='*')
@@ -429,7 +494,8 @@ def register_windows_list_handlers(dp: Dispatcher):
                                        state=MenuStates.EDIT_WINDOW)
 
     dp.register_callback_query_handler(back_to_edit_menu,
-                                       lambda c: c.data == 'back_to_edit_menu' and c.message.chat.type == ChatType.PRIVATE,
+                                       lambda
+                                           c: c.data == 'back_to_edit_menu' and c.message.chat.type == ChatType.PRIVATE,
                                        state=[MenuStates.EDIT_AUDI, MenuStates.EDIT_COMMENT, MenuStates.EDIT_WINDOW])
 
     dp.register_callback_query_handler(send_free_windows_menu,

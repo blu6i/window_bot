@@ -224,12 +224,12 @@ def is_date_in_schedule(date_str: str) -> bool:
     return result is not None
 
 
-def get_group_hash(group_id: int) -> str:
-    """Получение хэша группы по ID"""
+def get_group_hash(group_id: int) -> int:
+    """Получение ID группы по хэшу"""
     conn = get_connection()
     cursor = conn.cursor()
     try:
-        cursor.execute("SELECT Hash FROM Groups WHERE GroupID = ?", (group_id,))
+        cursor.execute("SELECT GroupID FROM Groups WHERE Hash = ?", (group_id,))
         result = cursor.fetchone()
         return result[0] if result else None
     except sqlite3.Error as e:
@@ -323,6 +323,68 @@ def is_time_still_free(group_id, teacher_id, cabinet_id, date, time):
     except Exception as e:
         logger.warning(f'Ошибка при повторном определении свободного времени: {e}')
         return False
+
+
+def get_group_tg_id(chat_id: int) -> int:
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT GroupID FROM Groups WHERE ChatID = ?", (chat_id,))
+    return cursor.fetchone()[0]
+
+
+def is_group_authorized(chat_id: int) -> bool:
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT 1
+        FROM Groups
+        WHERE ChatID = ?
+    """, (chat_id,))
+    row = cursor.fetchone()
+    return row is not None and row[0] is not None
+
+
+def is_group_hash_authorized(hash_code: str) -> bool:
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT ChatID
+        FROM Groups
+        WHERE Hash = ?
+    """, (hash_code,))
+    row = cursor.fetchone()
+    return row is not None and row[0] is not None
+
+
+def get_group_chat_id(chat_id: int) -> int:
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT ChatID FROM Groups WHERE GroupID = ?", (chat_id,))
+    return cursor.fetchone()[0]
+
+
+def get_meet_group(group_id: int):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT DISTINCT Date
+        FROM BusyWindows
+        WHERE GroupID = ? AND IsCompleted = 0
+        ORDER BY Date
+    """, (group_id,))
+    return [row[0] for row in cursor.fetchall()]
+
+
+def get_meet_date(group_id: int, date: str):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT DISTINCT Time, Comment, CabinetID
+        FROM BusyWindows
+        WHERE GroupID = ? AND Date = ? AND IsCompleted = 0
+        ORDER BY Time
+    """, (group_id, date))
+    return cursor.fetchall()
 
 
 def main():

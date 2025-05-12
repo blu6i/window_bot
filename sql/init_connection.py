@@ -160,8 +160,6 @@ def create_tables():
                 Date TEXT NOT NULL,
                 Time TEXT NOT NULL
             )""")
-
-        # 14. Занятые окна
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS BusyWindows (
                 BusyWindowID INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -170,14 +168,30 @@ def create_tables():
                 Comment TEXT,
                 GroupID INTEGER,
                 TeacherID INTEGER,
-                CabinetID INTEGER,
+                CabinetID TEXT,
                 InitiatorTeacherID INTEGER,
                 IsCompleted INTEGER DEFAULT 0,
                 FOREIGN KEY (GroupID) REFERENCES Groups(GroupID),
                 FOREIGN KEY (TeacherID) REFERENCES Teachers(TeacherID),
-                FOREIGN KEY (InitiatorTeacherID) REFERENCES Teachers(TeacherID),
-                FOREIGN KEY (CabinetID) REFERENCES Cabinets(CabinetID)
+                FOREIGN KEY (InitiatorTeacherID) REFERENCES Teachers(TeacherID)
             )""")
+        # 14. Занятые окна
+        #cursor.execute("""
+        #    CREATE TABLE IF NOT EXISTS BusyWindows (
+        #        BusyWindowID INTEGER PRIMARY KEY AUTOINCREMENT,
+        #        Date TEXT NOT NULL,
+        #        Time TEXT NOT NULL,
+        #        Comment TEXT,
+        #        GroupID INTEGER,
+        #        TeacherID INTEGER,
+        #        CabinetID INTEGER,
+        #        InitiatorTeacherID INTEGER,
+        #        IsCompleted INTEGER DEFAULT 0,
+        #        FOREIGN KEY (GroupID) REFERENCES Groups(GroupID),
+        #        FOREIGN KEY (TeacherID) REFERENCES Teachers(TeacherID),
+        #        FOREIGN KEY (InitiatorTeacherID) REFERENCES Teachers(TeacherID),
+        #        FOREIGN KEY (CabinetID) REFERENCES Cabinets(CabinetID)
+        #    )""")
 
         conn.commit()
         logger.info('Таблицы созданы с обновленной структурой')

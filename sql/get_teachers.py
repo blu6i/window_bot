@@ -193,6 +193,18 @@ def is_teacher_authorized(u_id: int) -> bool:
         logger.warning(f'Ошибка при поиске преподавателя {e}')
 
 
+def is_teacher_hash_authorized(hash_code: str) -> bool:
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT UserID
+        FROM Teachers
+        WHERE Hash = ?
+    """, (hash_code,))
+    row = cursor.fetchone()
+    return row is not None and row[0] is not None
+
+
 def get_meet_teacher(teacher_id):
     conn = get_connection()
     cursor = conn.cursor()
@@ -269,3 +281,17 @@ def get_teacher_id_tg(tg_id: int) -> int | None:
         return result[0] if result else None
     except Exception as e:
         logger.warning(f'Ошибка при получении ид преподавателя: {e}')
+
+
+def get_teacher_chat_id(teacher_id: int) -> int | None:
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT Users.CurrentID
+        FROM Teachers
+        JOIN Users ON Teachers.UserID = Users.UserID
+        WHERE Teachers.TeacherID = ?
+    """, (teacher_id,))
+    result = cursor.fetchone()
+    return result[0] if result else None
+

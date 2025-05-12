@@ -7,6 +7,7 @@ from aiogram.types import CallbackQuery, InlineKeyboardMarkup, InlineKeyboardBut
 
 import sql
 from bot import MenuStates
+from bot.handlers.common import notify_mp
 from bot.keyboards import get_edit_meeting_menu, get_time_selection_keyboard
 from sql import get_user_dates, get_user_groups, get_user_teachers, get_occupied_times_multi, update_meeting_entry
 
@@ -131,7 +132,7 @@ async def format_meetings_for_state(meetings_raw):
     return grouped
 
 
-async def show_meeting_details(message: types.Message, state: FSMContext):
+async def show_meeting_details(message: types.Message, state: FSMContext, sub_text: str = ""):
     async with state.proxy() as data:
         date = data['current_date']
         meetings = data['meetings'][date]
@@ -167,6 +168,8 @@ async def show_meeting_details(message: types.Message, state: FSMContext):
 🧑‍🏫 <b>Преподаватели:</b>\n{teacher_names}
 💬 <b>Комментарий:</b>\n{comment or '-'}
 {status} <b>Статус:</b> {'Завершено' if is_completed else 'Ожидается'}
+
+{sub_text or ""}
 """
 
     kb = types.InlineKeyboardMarkup(row_width=1)
@@ -190,7 +193,6 @@ async def show_meeting_details(message: types.Message, state: FSMContext):
             nav_buttons.append(types.InlineKeyboardButton("Следующее ➡", callback_data="next_meeting"))
         kb.row(*nav_buttons)
     kb.add(types.InlineKeyboardButton("🔙 Назад к датам", callback_data="back_to_dates"))
-
     await message.edit_text(text, parse_mode="HTML", reply_markup=kb)
 
 
@@ -306,8 +308,63 @@ async def mark_not_complete(callback: types.CallbackQuery, state: FSMContext):
     await callback.answer("🔄 Статус изменён: теперь это активная встреча")
 
 
-async def send_reminder(callback: types.CallbackQuery):
-    await callback.answer("📬 Оповещение отправлено всем участникам")
+async def send_reminder(callback: types.CallbackQuery, state: FSMContext):
+    async with state.proxy() as data:
+        date = data.get("current_date")
+        index = data.get("current_meeting_index")
+        meetings = data.get("meetings", {})
+        if not date or date not in meetings or index >= len(meetings[date]):
+            await callback.answer("❌ Невозможно найти данные встречи.")
+            return
+
+        meeting = meetings[date][index]
+        time = meeting.get("time")
+        comment = meeting.get("comment", "")
+        cabinet = meeting.get("cabinet_id", "")
+        group_id = meeting.get("groups")
+        group_name = ""
+        if group_id:
+            for group in group_id:
+                group_name += f"\n• {sql.get_group_name(group)}"
+        teacher_id = meeting.get("teachers")
+        teacher_name = ""
+        if teacher_id:
+            for teacher in teacher_id:
+                teacher_name += f"\n• {sql.get_teacher_name(teacher)}"
+        # Текст оповещения
+        text = (
+            f"🔔 Напоминание о встрече:\n"
+            f"📅 Дата:\n{date}\n"
+            f"⏰ Время:\n{time}\n\n"
+            f"🏫 Аудитория:\n{cabinet or 'Не указана'}\n\n"
+            f"👥 Группа:{group_name}\n"
+            f"👩🏻‍🏫 Преподаватель:{teacher_name}\n\n"
+            f"💬 Комментарий:\n{comment or 'Не указан'}"
+        )
+        # Отправляем уведомление
+        unnotified_groups, unnotified_teachers = await notify_mp(
+            group_ids=group_id if group_id else [],
+            teacher_ids=teacher_id if teacher_id else [],
+            message=text
+        )
+
+    # Обратная связь пользователю
+    if not unnotified_groups and not unnotified_teachers:
+        await callback.message.answer("📬 Уведомление успешно отправлено.")
+    else:
+        # Формируем сообщение о тех, кто не был уведомлен
+        not_notified_message = "❗️ Не удалось отправить уведомления следующим участникам:\n"
+        if unnotified_groups:
+            not_notified_message += f"Группы без чатов:"
+            for group in unnotified_groups:
+                not_notified_message += f"\n• {sql.get_group_name(group)}"
+        if unnotified_teachers:
+            not_notified_message += f"\nПреподаватели без TG ID:"
+            for teacher in unnotified_teachers:
+                not_notified_message += f"\n• {sql.get_teacher_name(teacher)}"
+
+    await show_meeting_details(callback.message, state, not_notified_message)
+    await callback.answer()
 
 
 async def start_edit_meeting(callback: types.CallbackQuery, state: FSMContext):
@@ -322,7 +379,7 @@ async def start_edit_meeting(callback: types.CallbackQuery, state: FSMContext):
             data['original_meeting'] = meeting.copy()
 
             # Также сохраняем старую дату и время, чтобы можно было позже сравнить
-            data['old_dates_times'] = [(meeting['time'], date)]
+            data['old_dates_times'] = [(date, meeting['time'])]
 
     # Ожидаем, что теперь можно выбрать, что редактировать
     await callback.message.edit_text("🔁 Выберите, что редактировать:", reply_markup=get_edit_meeting_menu())
@@ -506,7 +563,8 @@ async def confirm_changes(callback_query: types.CallbackQuery, state: FSMContext
     initiator_id = sql.get_teacher_id_tg(u_id)
     old_times = data.get("old_dates_times", [])
     new_times = data.get("final_times", old_times)
-    cabinet_id = data.get("cabinet_id")
+    cabinet_id = data.get("room")
+    print(cabinet_id)
     comment = data.get("comment")
 
     if old_times == new_times and cabinet_id is None and comment is None:
@@ -516,11 +574,9 @@ async def confirm_changes(callback_query: types.CallbackQuery, state: FSMContext
         return  # Нечего сохранять
 
     for i in range(len(old_times)):
-        old_time, old_date = old_times[i]
+        old_date, old_time = old_times[i]
         new_date, new_time = new_times[i]
         updated_fields = {}
-        print(old_date, old_time)
-        print(new_date, new_time)
         if (old_date, old_time) != (new_date, new_time):
             updated_fields["Date"] = new_date
             updated_fields["Time"] = new_time
@@ -529,7 +585,6 @@ async def confirm_changes(callback_query: types.CallbackQuery, state: FSMContext
         if comment is not None:
             updated_fields["Comment"] = comment
         if updated_fields:
-            print(initiator_id)
             update_meeting_entry(
                 initiator_id=initiator_id,
                 old_date=old_date,

@@ -1,3 +1,5 @@
+import hashlib
+import os
 import sqlite3
 from datetime import datetime
 
@@ -6,6 +8,17 @@ import pandas as pd
 from sql.get_info import get_user_id
 from sql.init_connection import get_connection
 from utils import logger
+from dotenv import load_dotenv
+
+load_dotenv('../config/.env')
+
+def generate_hash(fullname: str) -> str:
+    """
+    Генерирует хэш на основе полного имени преподавателя и секретного ключа из .env
+    """
+    key = os.getenv('HASH_TOKEN')
+    data_to_hash = key + fullname.strip()
+    return hashlib.sha256(data_to_hash.encode('utf-8')).hexdigest()
 
 
 # Добавление факультета
@@ -398,16 +411,17 @@ def add_groups(df: pd.DataFrame):
         if cursor.fetchone():
             logger.warning(f"Группа '{group_name}' уже существует")
             return
-
+        group_hash = generate_hash(group_name)
         # Вставляем группу с нормализованным названием
         cursor.execute("""
             INSERT INTO Groups (
-                GroupName, SpecializationID, GroupNameLow
-            ) VALUES (?, ?, ?)
+                GroupName, SpecializationID, GroupNameLow, Hash
+            ) VALUES (?, ?, ?, ?)
         """, (
             group_name,
             specialization_id,
-            group_name.lower()
+            group_name.lower(),
+            group_hash
         ))
 
         conn.commit()
@@ -540,3 +554,17 @@ def add_busy_window(current_date, times, group_id, teacher_id, cabinet_id, comme
         conn.commit()
     except Exception as e:
         logger.warning(f'Проблема при добавлении окна: {e}')
+
+
+def add_chat_group(group_id: int, chat_id: int):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("UPDATE Groups SET ChatID = ? WHERE GroupID = ?", (chat_id, group_id))
+    conn.commit()
+
+
+def unadd_chat_group(group_id: int):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("UPDATE Groups SET ChatID = ? WHERE ChatID = ?", (None, group_id))
+    conn.commit()

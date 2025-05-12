@@ -222,6 +222,13 @@ def update_teacher_userid(u_id, teacher_id):
     conn.commit()
 
 
+def unupdate_teacher_userid(teacher_id):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("UPDATE Teachers SET UserID = ? WHERE TeacherID = ?", (None, teacher_id))
+    conn.commit()
+
+
 def update_completed(meeting_id: int):
     conn = get_connection()
     cursor = conn.cursor()
@@ -274,12 +281,13 @@ def update_meeting_entry(initiator_id: int, old_date: str, old_time: str, update
 
     # фильтрация по инициатору, дате и времени
     values.extend([initiator_id, old_date, old_time])
-    print(values)
     query = f"""
         UPDATE BusyWindows
         SET {set_clause}
         WHERE InitiatorTeacherID = ? AND Date = ? AND Time = ?
     """
+    print(query)
+    print(values)
     cursor.execute(query, values)
     conn.commit()
 

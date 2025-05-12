@@ -1,11 +1,13 @@
-from aiogram import types, Dispatcher
+from aiogram import types, Dispatcher, bot
 from aiogram.dispatcher import FSMContext
 from aiogram.types import ReplyKeyboardRemove, ChatType
 
+import sql
 from bot import get_main_menu
 from sql import remove_schedule, remove_schedule_teacher
 from utils import logger
 from parser import groups_web_parse, parse_schedule_teacher
+from bot.init_bot import get_bot
 
 WELCOME_TEXT = ("Добро пожаловать в бота для поиска свободных окон в расписании групп!\n"
                 "\n"
@@ -75,6 +77,41 @@ async def cmd_start(msg: types.Message, state: FSMContext):
     msg = await msg.answer('🏠 Главное меню\n\nВыберите нужный раздел',
                            reply_markup=get_main_menu(msg.from_user.id))
     await state.update_data(last_msg=msg.message_id)
+
+
+async def notify_mp(group_ids: list, teacher_ids: list, message: str):
+    # Списки для тех, у кого нет привязанного TG ID
+    unnotified_groups = []
+    unnotified_teachers = []
+    _bot = get_bot()
+    # Оповещение по группам (если у группы есть чат)
+    for group_id in group_ids:
+        # Получаем ChatID группы из базы данных
+        chat_id = sql.get_group_chat_id(group_id)
+        if chat_id:
+            try:
+                await _bot.send_message(chat_id, message)
+            except Exception as e:
+                print(f"Ошибка при отправке сообщения в группу {group_id}: {e}")
+        else:
+            # Если нет chat_id, добавляем в список
+            unnotified_groups.append(group_id)
+
+    # Оповещение преподавателей (личные сообщения)
+    for teacher_id in teacher_ids:
+        # Получаем UserID преподавателя
+        user_id = sql.get_teacher_chat_id(teacher_id)
+        if user_id:
+            try:
+                await _bot.send_message(user_id, message)
+            except Exception as e:
+                print(f"Ошибка при отправке сообщения преподавателю {teacher_id}: {e}")
+        else:
+            # Если нет user_id, добавляем в список
+            unnotified_teachers.append(teacher_id)
+
+    # Возвращаем списки, в которые не удалось отправить уведомление
+    return unnotified_groups, unnotified_teachers
 
 
 def register_common_handlers(dp: Dispatcher):
