@@ -48,8 +48,11 @@ HELP_TEXT = ("<b>Основные функции:</b>\n"
              "\n"
              "<b>Как удалить дату?</b>\n"
              "1. Перейти в нужный раздел\n"
-             "2. Нажать на нужную дату для удаления")
+             "2. Нажать на нужную дату для удаления\n"
+             "\n"
+             "<a href='teletype.in/@pepegeshka/sFjYdnH8AVG'>Ссылка на подробный гайд (Кликабельно)</a>")
 
+# Не актуально
 
 async def send_help(event: Union[CallbackQuery, Message], state: FSMContext):
     """Обработка /help или кнопки ℹ️ Помощь"""
@@ -71,7 +74,7 @@ async def send_help(event: Union[CallbackQuery, Message], state: FSMContext):
 
 
 def register_help_handlers(dp: Dispatcher):
-    # Вывод помощи через команду (!Переделать)
+    # Вывод помощи через команду (! Переделать)
     dp.register_message_handler(send_help,
                                 commands=["help"],
                                 chat_type=ChatType.PRIVATE,

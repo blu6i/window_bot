@@ -3,34 +3,18 @@ from typing import Union
 
 from aiogram import types, Dispatcher
 from aiogram.dispatcher import FSMContext
-from aiogram.types import CallbackQuery, Message, ChatType, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import ChatType, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.utils.exceptions import MessageNotModified
 
 import sql
 from bot import MenuStates, get_main_menu
-from bot.handlers.common import notify_mp
-
-# Предопределённые временные интервалы
-PAIR_TIMES = [
-    "08:20-09:50",
-    "10:00-11:30",
-    "11:45-13:15",
-    "14:00-15:30",
-    "15:45-17:15",
-    "17:20-18:50",
-    "18:55-20:25"
-]
+from bot.handlers.common import notify_mp, back_to_main, generate_free_windows_multi
+from bot.keyboards import get_free_windows_keyboard, generate_edit_menu_keyboard
 
 
-def generate_free_windows_multi(occupied: dict) -> dict:
-    free_windows = {}
-    for date, busy_times in occupied.items():
-        free = [pair for pair in PAIR_TIMES if pair not in busy_times]
-        free_windows[date] = free
-    return free_windows
-
-
-async def show_current_page(message: types.Message, state: FSMContext):
+# =======[Выбор свободного времени]=======
+async def show_current_page(message: types.Message, state: FSMContext, text: str = ''):
+    """Вывод свободных окон"""
     async with state.proxy() as data:
         dates = data['dates']
         free_windows = data['free_windows']
@@ -43,29 +27,14 @@ async def show_current_page(message: types.Message, state: FSMContext):
     current_date = dates[page]
     free_times = free_windows.get(current_date, [])
 
-    kb = types.InlineKeyboardMarkup(row_width=2)
+    kb = get_free_windows_keyboard(current_date=current_date, free_times=free_times, selected=selected, page=page,
+                                   total_pages=len(dates))
 
-    if not free_times:
-        kb.add(types.InlineKeyboardButton("Свободного времени нет", callback_data="none"))
-    else:
-        for time in free_times:
-            text = f"{time} ✅" if selected.get(current_date, {}).get(time) else time
-            button_key = f"{current_date}_{time}"
-            callback_data = f"del_{button_key}" if selected.get(current_date, {}).get(time) else f"add_{button_key}"
-            kb.add(types.InlineKeyboardButton(text=text, callback_data=callback_data))
-
-    nav_buttons = []
-    if page > 0:
-        nav_buttons.append(types.InlineKeyboardButton("⬅ Назад", callback_data="prev_page"))
-    if page < len(dates) - 1:
-        nav_buttons.append(types.InlineKeyboardButton("Вперед ➡", callback_data="next_page"))
-    if nav_buttons:
-        kb.row(*nav_buttons)
-
-    kb.add(types.InlineKeyboardButton("Подтвердить время", callback_data="confirm_time"))
-    kb.add(types.InlineKeyboardButton("Назад в меню", callback_data="back_to_menu"))
-
-    msg_text = f"📅 Выберите свободное время для {current_date}:"
+    msg_text = (f"📅 Выберите свободное время для {current_date}:\n"
+                f"\n"
+                f"{'Свободного времени нет' if not free_times else ''}\n"
+                f"\n"
+                f"{text}")
 
     if isinstance(message, types.CallbackQuery):
         await message.message.edit_text(msg_text, reply_markup=kb)
@@ -74,19 +43,28 @@ async def show_current_page(message: types.Message, state: FSMContext):
 
 
 async def send_free_windows_menu(call: types.CallbackQuery, state: FSMContext, page=0):
-    """Меню со свободным временем"""
+    """Инициализация меню со свободными окнами"""
     try:
         u_id = call.from_user.id
         dates = sql.get_user_dates(u_id)
-        if not dates:
-            await call.message.answer("Нет доступных дат.")
-            return
-
         group_ids = sql.get_user_groups(u_id)
         teacher_ids = sql.get_user_teachers(u_id)
+        if not dates:
+            await back_to_main(
+                call=call,
+                state=state,
+                text="⚠️ Вы не указали дату!"
+            )
+            return
+        elif not group_ids:
+            await back_to_main(
+                call=call,
+                state=state,
+                text="⚠️ Вы не указали группы!"
+            )
+            return
 
-        occupied = sql.get_occupied_times_multi(group_ids, teacher_ids, dates)
-        free_windows = generate_free_windows_multi(occupied)
+        free_windows = generate_free_windows_multi(group_ids, teacher_ids, dates)
 
         async with state.proxy() as data:
             data['group_ids'] = group_ids
@@ -95,7 +73,6 @@ async def send_free_windows_menu(call: types.CallbackQuery, state: FSMContext, p
             data['free_windows'] = free_windows
             data['current_page'] = page
 
-            # 🟢 Не очищаем 'selected', если оно было
             if 'selected' not in data:
                 data['selected'] = {}
 
@@ -106,6 +83,9 @@ async def send_free_windows_menu(call: types.CallbackQuery, state: FSMContext, p
 
 
 async def handle_add_time(call: types.CallbackQuery, state: FSMContext):
+    """
+    Добавление время в список выбранных, если время выбрана за др дату, то обнуляем предыдущие
+    """
     try:
         _, key = call.data.split('_', 1)
         new_date, new_time = key.split('_', 1)
@@ -119,9 +99,9 @@ async def handle_add_time(call: types.CallbackQuery, state: FSMContext):
 
             selected = data.get('selected', {})
 
-            # ❌ Удаляем все старые записи, если это новая дата или новая пара
+            # Удаляем все старые записи, если это новая дата или новая пара
             if new_date not in selected or not selected[new_date]:
-                selected = {new_date: {}}  # Очищаем всё, если это первая пара для этой даты
+                selected = {new_date: {}}
 
             selected[new_date][new_time] = True
             data['selected'] = selected
@@ -176,14 +156,18 @@ async def handle_pagination(call: types.CallbackQuery, state: FSMContext):
 
 
 async def confirm_selected_time(call: types.CallbackQuery, state: FSMContext):
-    """Подтверждение выбора времени"""
+    """
+    Подтверждение выбора времени.
+    Проверяет, выбрано ли время на любой из страниц (дат).
+    """
     try:
         async with state.proxy() as data:
-            current_date = data['dates'][data['current_page']]
-            selected_times = data['selected'].get(current_date, {})
+            selected = data.get('selected', {})
+            has_any_selection = any(times for times in selected.values())
 
-        if not selected_times:
-            await call.answer("Вы не выбрали ни одно время.", show_alert=True)
+        if not has_any_selection:
+            text = "⚠️ Вы не выбрали ни одного времени для встречи."
+            await show_current_page(call.message, state, text)
             return
 
         await show_edit_menu(call, state)
@@ -191,47 +175,56 @@ async def confirm_selected_time(call: types.CallbackQuery, state: FSMContext):
         await call.answer()
 
 
-async def show_edit_menu(event: Union[CallbackQuery, Message], state: FSMContext):
+# =======[Меню для ввода доп. информации]=======
+async def show_edit_menu(event: Union[types.CallbackQuery, types.Message], state: FSMContext, text: str = ""):
+    """Вывод пунктов меню для редакции"""
     async with state.proxy() as data:
         cabinet = data.get('cabinet')
         comment = data.get('comment')
 
-    kb = types.InlineKeyboardMarkup()
+    # Формируем текст
+    cabinet_display = cabinet if cabinet else "Не указана"
+    comment_display = comment if comment else "Не указан"
 
-    audi_text = "🏫 Аудитория"
-    if cabinet:
-        audi_text += " ✅"
-    kb.add(types.InlineKeyboardButton(audi_text, callback_data="edit_audi"))
+    text = (
+        "🏫 Выбранная аудитория:\n"
+        f"{cabinet_display}\n"
+        "📢 Ваш комментарий:\n"
+        f"{comment_display}\n"
+        "\n"
+        "📝 Заполните или измените данные:\n"
+        "\n"
+        f"{text}"
+    )
 
-    comment_text = "📢 Комментарий"
-    if comment:
-        comment_text += " ✅"
-    kb.add(types.InlineKeyboardButton(comment_text, callback_data="edit_comment"))
-
-    kb.add(types.InlineKeyboardButton("✉️ Подтвердить", callback_data="finalize"))
-    kb.add(types.InlineKeyboardButton("🔙 Назад", callback_data="back_to_window"))
-
-    text = "📝 Заполните данные:"
+    # Формируем клавиатуру
+    kb = generate_edit_menu_keyboard(
+        cabinet=cabinet,
+        comment=comment)
 
     # Логика отправки или редактирования сообщения
-    if isinstance(event, CallbackQuery):
+    if isinstance(event, types.CallbackQuery):
         message = event.message
         try:
             await message.edit_text(text, reply_markup=kb)
         except MessageNotModified:
             pass
-    elif isinstance(event, Message):
+    elif isinstance(event, types.Message):
         await event.answer(text, reply_markup=kb)
 
 
+# ======[Ввод аудитории]======
 async def edit_cabinet(callback_query: types.CallbackQuery, state: FSMContext):
+    """Меню с вводом аудитории"""
     try:
         data = await state.get_data()
-        current_room = data.get("cabinet", "не указана")
+        current_room = data.get("cabinet", "Не указана")
 
         await MenuStates.EDIT_AUDI.set()
         await callback_query.message.edit_text(
-            f"Текущая аудитория: {current_room}\n\nВведите новую аудиторию:",
+            f"Текущая аудитория: {current_room}\n"
+            "\n"
+            "Введите новую аудиторию:",
             reply_markup=InlineKeyboardMarkup().add(
                 InlineKeyboardButton("🔙 Назад", callback_data="back_to_edit_menu")
             )
@@ -241,6 +234,7 @@ async def edit_cabinet(callback_query: types.CallbackQuery, state: FSMContext):
 
 
 async def process_edit_cabinet(message: types.Message, state: FSMContext):
+    """Проверка ввода аудитории"""
     cabinet = message.text.strip()
     if not re.match(r"^\d{1,2}-\d{3}[а-яa-z_]?$", cabinet, re.IGNORECASE):
         await message.answer("❌ Неверный формат аудитории. Пример: 11-213, 1-003_, 5-312а")
@@ -249,24 +243,31 @@ async def process_edit_cabinet(message: types.Message, state: FSMContext):
     await state.update_data(cabinet=cabinet)
 
     await message.answer(
-        f"✅ Аудитория изменена на: {cabinet}\n\nВведите другую или нажмите 'Назад' для возврата:",
+        f"✅ Аудитория изменена на: {cabinet}\n"
+        "\n"
+        "Введите другую или нажмите 'Назад' для возврата:",
         reply_markup=InlineKeyboardMarkup().add(
             InlineKeyboardButton("🔙 Назад", callback_data="back_to_edit_menu")
         )
     )
 
 
+# ======[Ввод комментария]======
 async def edit_comment(call: types.CallbackQuery, state: FSMContext):
-    """Выбор комментария"""
+    """Ввод комментария"""
     try:
         data = await state.get_data()
         comment = data.get("comment", "не указана")
         kb = types.InlineKeyboardMarkup(row_width=1)
         kb.add(types.InlineKeyboardButton("Назад", callback_data="back_to_edit_menu"))
         if comment:
-            await call.message.edit_text(f"Ваш комментарий:\n{comment}\n\nВведите новый комментарий:", reply_markup=kb)
+            await call.message.edit_text(f"Ваш комментарий:\n{comment}\n"
+                                         "\n"
+                                         "Введите новый комментарий:",
+                                         reply_markup=kb)
         else:
-            await call.message.edit_text("Введите комментарий:", reply_markup=kb)
+            await call.message.edit_text("Введите комментарий:",
+                                         reply_markup=kb)
         await MenuStates.EDIT_COMMENT.set()
     finally:
         await call.answer()
@@ -287,8 +288,10 @@ async def save_comment(message: types.Message, state: FSMContext):
     )
 
 
+# ======[Финальный предпросмотр]======
 async def finalize_selection(call: types.CallbackQuery, state: FSMContext):
     """Подтверждение информации"""
+    u_id = call.from_user.id
     try:
         async with state.proxy() as data:
             current_date = data['dates'][data['current_page']]
@@ -302,14 +305,14 @@ async def finalize_selection(call: types.CallbackQuery, state: FSMContext):
         # Проверяем, не занято ли время за время заполнения формы
         for time in selected_times:
             if not sql.is_time_still_free(group_id, teacher_id, cabinet_id, current_date, time):
-                await call.answer("⚠️ Выбранное время было занято другим пользователем.", show_alert=True)
-                await show_edit_menu(call, state)
+                text = "⚠️ Выбранное время было занято другим пользователем."
+                await show_edit_menu(call, state, text)
                 return
     finally:
         await call.answer()
-
+    initiator_teacher_name = sql.get_teacher_name(sql.get_teacher_id_tg(u_id))
     # Отправляем на подтверждение
-    summary = generate_summary(data)
+    summary = generate_summary(data, initiator_teacher_name)
     kb = types.InlineKeyboardMarkup()
     kb.add(types.InlineKeyboardButton("Подтвердить", callback_data="save_final"))
     kb.add(types.InlineKeyboardButton("Редактировать", callback_data="back_to_edit_menu"))
@@ -317,12 +320,13 @@ async def finalize_selection(call: types.CallbackQuery, state: FSMContext):
     await call.message.edit_text(summary, reply_markup=kb)
 
 
-def generate_summary(data: dict) -> str:
+def generate_summary(data: dict, initiator_teacher_name: str) -> str:
+    """Генератор текста для просмотра"""
     current_date = data['dates'][data['current_page']]
     times = list(data['selected'][current_date].keys())
 
-    cabinet = data.get('cabinet', '-')
-    comment = data.get('comment', '-')
+    cabinet = data.get('cabinet', 'Не указана')
+    comment = data.get('comment', 'Не указан')
     group_ids = data.get('group_ids', [])
     teacher_ids = data.get('teacher_ids', [])
 
@@ -343,21 +347,23 @@ def generate_summary(data: dict) -> str:
     # Собираем итоговое сообщение
     summary = (
         "📌 Предварительный просмотр:\n\n"
+        f"⚡ Инициатор:\n{initiator_teacher_name}\n\n"
         f"📅 Дата:\n{current_date}\n"
-        f"⏰ Время:\n{times_str}\n"
-        f"🏫 Аудитория:\n{cabinet}\n"
-        f"🧑‍🏫 Преподаватель(и):\n{teachers_str}\n"
-        f"👥 Группа(ы):\n{groups_str}\n"
+        f"⏰ Время:\n{times_str}\n\n"
+        f"🏫 Аудитория:\n{cabinet}\n\n"
+        f"👥 Группы:\n{groups_str}\n"
+        f"🧑‍🏫 Преподаватели:\n{teachers_str}\n"
         f"💬 Комментарий:\n{comment}"
     )
 
     return summary
 
 
+# ======[Подтверждение]======
 async def save_final_data(call: types.CallbackQuery, state: FSMContext):
     try:
         u_id = call.from_user.id
-        initiator_teacher_id = sql.get_user_id(u_id)
+        initiator_teacher_id = sql.get_teacher_id_tg(u_id)
 
         async with state.proxy() as data:
             current_date = data['dates'][data['current_page']]
@@ -365,21 +371,32 @@ async def save_final_data(call: types.CallbackQuery, state: FSMContext):
             group_ids = data.get('group_ids', [])
             teacher_ids = data.get('teacher_ids', [])
             cabinet = data.get('cabinet')
-            cabinet_id = cabinet.get('id') if cabinet and 'id' in cabinet else None
+            #cabinet_id = cabinet.get('id') if cabinet and 'id' in cabinet else None
             comment = data.get('comment')
 
-            groups = group_ids if group_ids else [None]
-            teachers = teacher_ids if teacher_ids else [None]
+            groups = group_ids if group_ids else None
+            teachers = teacher_ids if teacher_ids else None
 
         # Добавление записи в таблицу
         for group_id in groups:
-            for teacher_id in teachers:
+            if teachers:
+                for teacher_id in teachers:
+                    sql.add_busy_window(
+                        current_date=current_date,
+                        times=times,
+                        group_id=group_id,
+                        teacher_id=teacher_id,
+                        cabinet_id=cabinet,
+                        comment=comment,
+                        initiator_teacher_id=initiator_teacher_id
+                    )
+            else:
                 sql.add_busy_window(
                     current_date=current_date,
                     times=times,
                     group_id=group_id,
-                    teacher_id=teacher_id,
-                    cabinet_id=cabinet_id,
+                    teacher_id=None,
+                    cabinet_id=cabinet,
                     comment=comment,
                     initiator_teacher_id=initiator_teacher_id
                 )
@@ -395,9 +412,10 @@ async def save_final_data(call: types.CallbackQuery, state: FSMContext):
 
         text = (
             f"🔔 Запланирована новая встреча:\n"
+            f"⚡ Инициатор:\n{sql.get_teacher_name(initiator_teacher_id)}\n\n"
             f"📅 Дата:\n{current_date}\n"
             f"⏰ Время:\n{', '.join(times)}\n\n"
-            f"🏫 Аудитория:\n{cabinet_id or 'Не указана'}\n\n"
+            f"🏫 Аудитория:\n{cabinet or 'Не указана'}\n\n"
             f"👥 Группы:{group_name}\n"
             f"👩🏻‍🏫 Преподаватели:{teacher_name}\n\n"
             f"💬 Комментарий:\n{comment or 'Не указан'}"
@@ -407,7 +425,7 @@ async def save_final_data(call: types.CallbackQuery, state: FSMContext):
         unnotified_groups, unnotified_teachers = await notify_mp(group_ids, teacher_ids, text)
 
         # Сообщение об успешном сохранении
-        await call.message.edit_text("✅ Мероприятие(я) успешно запланировано(ы)! Участники оповещены.")
+        await call.message.edit_text("✅ Мероприятие успешно запланировано! Участники оповещены.")
 
         # Обратная связь пользователю
         if not unnotified_groups and not unnotified_teachers:
@@ -444,13 +462,17 @@ async def back_to_edit_menu(call: types.CallbackQuery, state: FSMContext):
 
 
 def register_windows_list_handlers(dp: Dispatcher):
-    dp.register_message_handler(process_edit_cabinet,
-                                state=MenuStates.EDIT_AUDI,
-                                chat_type=ChatType.PRIVATE,
-                                content_types=types.ContentTypes.TEXT)
-    dp.register_callback_query_handler(send_free_windows_menu,
-                                       lambda c: c.data == 'menu_teacher_window' and c.message.chat.type == ChatType.PRIVATE,
-                                       state='*')
+    dp.register_message_handler(
+        process_edit_cabinet,
+        state=MenuStates.EDIT_AUDI,
+        chat_type=ChatType.PRIVATE,
+        content_types=types.ContentTypes.TEXT
+    )
+    dp.register_callback_query_handler(
+        send_free_windows_menu,
+        lambda c: c.data == 'menu_teacher_window' and c.message.chat.type == ChatType.PRIVATE,
+        state='*'
+    )
 
     dp.register_callback_query_handler(
         handle_add_time,
@@ -470,34 +492,49 @@ def register_windows_list_handlers(dp: Dispatcher):
         state=MenuStates.EDIT_WINDOW
     )
 
-    dp.register_callback_query_handler(confirm_selected_time,
-                                       lambda c: c.data == 'confirm_time' and c.message.chat.type == ChatType.PRIVATE,
-                                       state=MenuStates.EDIT_WINDOW)
+    dp.register_callback_query_handler(
+        confirm_selected_time,
+        lambda c: c.data == 'confirm_time' and c.message.chat.type == ChatType.PRIVATE,
+        state=MenuStates.EDIT_WINDOW
+    )
 
-    dp.register_callback_query_handler(edit_cabinet,
-                                       lambda c: c.data == 'edit_audi' and c.message.chat.type == ChatType.PRIVATE,
-                                       state=MenuStates.EDIT_WINDOW)
-    dp.register_callback_query_handler(edit_comment,
-                                       lambda c: c.data == 'edit_comment' and c.message.chat.type == ChatType.PRIVATE,
-                                       state=MenuStates.EDIT_WINDOW)
+    dp.register_callback_query_handler(
+        edit_cabinet,
+        lambda c: c.data == 'edit_audi' and c.message.chat.type == ChatType.PRIVATE,
+        state=MenuStates.EDIT_WINDOW
+    )
+    dp.register_callback_query_handler(
+        edit_comment,
+        lambda c: c.data == 'edit_comment' and c.message.chat.type == ChatType.PRIVATE,
+        state=MenuStates.EDIT_WINDOW
+    )
 
-    dp.register_message_handler(save_comment,
-                                chat_type=ChatType.PRIVATE,
-                                state=MenuStates.EDIT_COMMENT)
+    dp.register_message_handler(
+        save_comment,
+        chat_type=ChatType.PRIVATE,
+        state=MenuStates.EDIT_COMMENT
+    )
 
-    dp.register_callback_query_handler(finalize_selection,
-                                       lambda c: c.data == 'finalize' and c.message.chat.type == ChatType.PRIVATE,
-                                       state=MenuStates.EDIT_WINDOW)
+    dp.register_callback_query_handler(
+        finalize_selection,
+        lambda c: c.data == 'finalize' and c.message.chat.type == ChatType.PRIVATE,
+        state=MenuStates.EDIT_WINDOW
+    )
 
-    dp.register_callback_query_handler(save_final_data,
-                                       lambda c: c.data == 'save_final' and c.message.chat.type == ChatType.PRIVATE,
-                                       state=MenuStates.EDIT_WINDOW)
+    dp.register_callback_query_handler(
+        save_final_data,
+        lambda c: c.data == 'save_final' and c.message.chat.type == ChatType.PRIVATE,
+        state=MenuStates.EDIT_WINDOW
+    )
 
-    dp.register_callback_query_handler(back_to_edit_menu,
-                                       lambda
-                                           c: c.data == 'back_to_edit_menu' and c.message.chat.type == ChatType.PRIVATE,
-                                       state=[MenuStates.EDIT_AUDI, MenuStates.EDIT_COMMENT, MenuStates.EDIT_WINDOW])
+    dp.register_callback_query_handler(
+        back_to_edit_menu,
+        lambda c: c.data == 'back_to_edit_menu' and c.message.chat.type == ChatType.PRIVATE,
+        state=[MenuStates.EDIT_AUDI, MenuStates.EDIT_COMMENT, MenuStates.EDIT_WINDOW]
+    )
 
-    dp.register_callback_query_handler(send_free_windows_menu,
-                                       lambda c: c.data == 'back_to_window' and c.message.chat.type == ChatType.PRIVATE,
-                                       state=MenuStates.EDIT_WINDOW)
+    dp.register_callback_query_handler(
+        send_free_windows_menu,
+        lambda c: c.data == 'back_to_window' and c.message.chat.type == ChatType.PRIVATE,
+        state=MenuStates.EDIT_WINDOW
+    )

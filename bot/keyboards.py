@@ -35,7 +35,7 @@ def get_main_menu(u_id: int):
     if sql.is_teacher_authorized(u_id):
         keyboard.row(InlineKeyboardButton("🪟 Мои встречи", callback_data="my_meet"))
 
-    keyboard.row(InlineKeyboardButton("ℹ️ Помощь", callback_data="help"))
+    keyboard.row(InlineKeyboardButton("ℹ️ Помощь", url="teletype.in/@pepegeshka/sFjYdnH8AVG"))
 
     keyboard.row(InlineKeyboardButton("🔗 Ссылки быстрого доступа", callback_data="menu_links"))
 
@@ -218,11 +218,11 @@ def get_edit_meeting_menu():
 
 
 def get_time_selection_keyboard(
-    date: str,
-    times: list,
-    selected_times: list,
-    page: int,
-    total_pages: int
+        date: str,
+        times: list,
+        selected_times: list,
+        page: int,
+        total_pages: int
 ):
     keyboard = InlineKeyboardMarkup(row_width=2)
 
@@ -250,3 +250,90 @@ def get_time_selection_keyboard(
     return keyboard
 
 
+def get_free_windows_keyboard(
+        current_date: str,
+        free_times: list,
+        selected: dict,
+        page: int,
+        total_pages: int
+) -> InlineKeyboardMarkup:
+    kb = InlineKeyboardMarkup(row_width=2)
+
+    # Добавляем кнопки времени
+    for time in free_times:
+        is_selected = selected.get(current_date, {}).get(time, False)
+        text = f"{time} ✅" if is_selected else time
+        button_key = f"{current_date}_{time}"
+        callback_data = f"del_{button_key}" if is_selected else f"add_{button_key}"
+        kb.add(InlineKeyboardButton(text=text, callback_data=callback_data))
+
+    # Навигация
+    nav_buttons = []
+    if page > 0:
+        nav_buttons.append(InlineKeyboardButton("⬅ Назад", callback_data="prev_page"))
+    if page < total_pages - 1:
+        nav_buttons.append(InlineKeyboardButton("Вперед ➡", callback_data="next_page"))
+    if nav_buttons:
+        kb.row(*nav_buttons)
+
+    # Подтверждение и возврат
+    kb.add(InlineKeyboardButton("Подтвердить время", callback_data="confirm_time"))
+    kb.add(InlineKeyboardButton("Назад в меню", callback_data="back_to_menu"))
+
+    return kb
+
+
+def generate_edit_menu_keyboard(cabinet: str = None, comment: str = None) -> InlineKeyboardMarkup:
+    kb = InlineKeyboardMarkup()
+
+    audi_text = "🏫 Аудитория"
+    if cabinet:
+        audi_text += " ✅"
+
+    kb.add(InlineKeyboardButton(audi_text, callback_data="edit_audi"))
+
+    comment_text = "📢 Комментарий"
+    if comment:
+        comment_text += " ✅"
+
+    kb.add(InlineKeyboardButton(comment_text, callback_data="edit_comment"))
+
+    kb.add(InlineKeyboardButton("✉️ Подтвердить", callback_data="finalize"))
+    kb.add(InlineKeyboardButton("🔙 Назад", callback_data="back_to_window"))
+
+    return kb
+
+
+def generate_meeting_keyboard(meeting: dict,
+                              idx: int,
+                              meetings_count: int,
+                              teacher_id: int) -> InlineKeyboardMarkup:
+    kb = InlineKeyboardMarkup(row_width=1)
+
+    is_completed = meeting["is_completed"]
+    initiator_id = meeting["initiator_id"]
+    # Кнопка завершения
+    if not is_completed:
+        kb.add(InlineKeyboardButton("✅ Отметить как пройденное", callback_data="mark_complete"))
+    else:
+        kb.add(InlineKeyboardButton("❌ Отметить как не пройденное", callback_data="mark_not_complete"))
+
+    # Кнопки редактирования/удаления
+    if initiator_id == teacher_id:
+        kb.add(InlineKeyboardButton("🗑️ Удалить встречу", callback_data="delete_meeting"))
+        kb.add(InlineKeyboardButton("🔁 Редактировать встречу", callback_data="edit_meeting"))
+
+    kb.add(InlineKeyboardButton("🔔 Отправить напоминание", callback_data="send_reminder"))
+
+    # Навигация
+    if meetings_count > 1:
+        nav_buttons = []
+        if idx > 0:
+            nav_buttons.append(InlineKeyboardButton("⬅ Предыдущее", callback_data="prev_meeting"))
+        if idx < meetings_count - 1:
+            nav_buttons.append(InlineKeyboardButton("Следующее ➡", callback_data="next_meeting"))
+        kb.row(*nav_buttons)
+
+    kb.add(InlineKeyboardButton("🔙 Назад к датам", callback_data="back_to_dates"))
+
+    return kb

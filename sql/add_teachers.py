@@ -199,7 +199,7 @@ def add_user_teacher(user: int, teacher_name: str) -> bool:
     conn = get_connection()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT TeacherID FROM Teachers WHERE FullName = ?", (teacher_name,))
+    cursor.execute("SELECT TeacherID FROM Teachers WHERE TeacherFullNameLow = ?", (teacher_name.lower(),))
     row = cursor.fetchone()
     if not row:
         return False
@@ -229,30 +229,37 @@ def unupdate_teacher_userid(teacher_id):
     conn.commit()
 
 
-def update_completed(meeting_id: int):
-    conn = get_connection()
-    cursor = conn.cursor()
-    try:
-        cursor.execute("UPDATE BusyWindows SET IsCompleted = 1 WHERE BusyWindowID = ?", (meeting_id,))
-        conn.commit()
-        return cursor.rowcount > 0
-    except Exception as e:
-        logger.warning(f'Ошибка при обновлении записи с пройденной встречей: {e}')
-
-
-def update_not_completed(meeting_id: int):
+def update_completed(date: str, time: str, initiator_id: int) -> bool:
     conn = get_connection()
     cursor = conn.cursor()
     try:
         cursor.execute("""
-            UPDATE BusyWindows 
-            SET IsCompleted = 0 
-            WHERE BusyWindowID = ?
-        """, (meeting_id,))
+            UPDATE BusyWindows
+            SET IsCompleted = 1
+            WHERE Date = ? AND Time = ? AND InitiatorTeacherID = ?
+        """, (date, time, initiator_id))
         conn.commit()
         return cursor.rowcount > 0
     except Exception as e:
-        logger.warning(f'Ошибка при обновлении записи с пройденной встречей: {e}')
+        logger.warning(f'Ошибка при обновлении встречи: {e}')
+        return False
+
+
+def update_not_completed(date: str, time: str, initiator_id: int) -> bool:
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            UPDATE BusyWindows
+            SET IsCompleted = 0
+            WHERE Date = ? AND Time = ? AND InitiatorTeacherID = ?
+        """, (date, time, initiator_id))
+        conn.commit()
+        return cursor.rowcount > 0
+    except Exception as e:
+        logger.warning(f'Ошибка при отмене отметки встречи: {e}')
+        return False
+
 
 
 def update_meeting_in_db(meeting_id: int, cabinet_id: int, comment: str):
@@ -290,4 +297,3 @@ def update_meeting_entry(initiator_id: int, old_date: str, old_time: str, update
     print(values)
     cursor.execute(query, values)
     conn.commit()
-

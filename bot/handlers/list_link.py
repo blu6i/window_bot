@@ -14,6 +14,8 @@ async def show_links(call: types.CallbackQuery, state: FSMContext):
 
 def register_link_handlers(dp: Dispatcher):
     # Вывод меню со ссылками
-    dp.register_callback_query_handler(show_links,
-                                       lambda c: c.data == "menu_links" and c.message.chat.type == ChatType.PRIVATE,
-                                       state="*")
+    dp.register_callback_query_handler(
+        show_links,
+        lambda c: c.data == "menu_links" and c.message.chat.type == ChatType.PRIVATE,
+        state="*"
+    )

@@ -42,7 +42,7 @@ def get_teacher_id(full_name: str) -> int | None:
     conn = get_connection()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT TeacherID FROM Teachers WHERE FullName = ?", (full_name,))
+    cursor.execute("SELECT TeacherID FROM Teachers WHERE TeacherFullNameLow = ?", (full_name.lower(),))
     row = cursor.fetchone()
     return row[0] if row else None
 
@@ -53,7 +53,7 @@ def get_all_teachers() -> list[str]:
     cursor = conn.cursor()
 
     # Выполняем запрос, чтобы получить все группы
-    query = "SELECT FullName FROM Teachers"
+    query = "SELECT TeacherFullNameLow FROM Teachers"
     cursor.execute(query)
 
     # Получаем результаты

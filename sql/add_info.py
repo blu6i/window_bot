@@ -550,10 +550,19 @@ def add_busy_window(current_date, times, group_id, teacher_id, cabinet_id, comme
                 INSERT INTO BusyWindows 
                     (Date, Time, GroupID, TeacherID, CabinetID, Comment, InitiatorTeacherID)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, (current_date, time, group_id, teacher_id, cabinet_id, comment, initiator_teacher_id))
+            """, (
+                current_date,
+                time,
+                group_id,
+                teacher_id if teacher_id is not None else None,
+                cabinet_id,
+                comment,
+                initiator_teacher_id
+            ))
         conn.commit()
     except Exception as e:
         logger.warning(f'Проблема при добавлении окна: {e}')
+
 
 
 def add_chat_group(group_id: int, chat_id: int):

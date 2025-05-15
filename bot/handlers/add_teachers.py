@@ -12,43 +12,57 @@ from utils import logger
 
 async def callback_add_teacher(call: types.CallbackQuery, state: FSMContext):
     """Добавление преподавателя по ID"""
-    u_id = call.from_user.id
-    teacher_id = call.data[len("add_teachers_"):]
-    teacher_name = sql.get_teacher_name(teacher_id)
-    sql.add_user_teacher(u_id, teacher_name)
-    text = f"✅ Преподаватель «{teacher_name}» добавлен!"
+    try:
+        u_id = call.from_user.id
+        teacher_id = call.data[len("add_teachers_"):]
+        teacher_name = sql.get_teacher_name(teacher_id)
+        sql.add_user_teacher(u_id, teacher_name)
+        text = f"✅ Преподаватель «{teacher_name}» добавлен!"
 
-    await state.update_data(message=text)
-    await refresh_add_teacher_message(call, state, u_id)
+        await state.update_data(message=text)
+        await refresh_add_teacher_message(call, state, u_id)
+    except Exception as e:
+        logger.warning(f'Ошибка при добавлении преподавателя по кнопке: {e}')
+    finally:
+        await call.answer()
 
 
 async def callback_del_teachers(call: types.CallbackQuery, state: FSMContext):
     """Удаление преподавателя"""
-    u_id = call.from_user.id
-    teacher_id = call.data[len("del_teachers_"):]
-    teacher_name = sql.get_teacher_name(teacher_id)
+    try:
+        u_id = call.from_user.id
+        teacher_id = call.data[len("del_teachers_"):]
+        teacher_name = sql.get_teacher_name(teacher_id)
 
-    sql.remove_user_teacher(u_id, teacher_name)
-    text = f"❌ Преподаватель «{teacher_name}» удалён."
+        sql.remove_user_teacher(u_id, teacher_name)
+        text = f"❌ Преподаватель «{teacher_name}» удалён."
 
-    await state.update_data(message=text)
-    await refresh_add_teacher_message(call, state, u_id)
+        await state.update_data(message=text)
+        await refresh_add_teacher_message(call, state, u_id)
+    except Exception as e:
+        logger.warning(f'Проблема при отмене добавленного преподавателя: {e}')
+    finally:
+        await call.answer()
 
 
 async def callback_add_all_teachers(call: types.CallbackQuery, state: FSMContext):
     """Добавление всех преподавателей из подразделения"""
-    u_id = call.from_user.id
-    u_teachers = sql.get_all_teachers()
-    data = await state.get_data()
-    teachers = data.get('found_teachers', [])
-    print(teachers)
-    for teacher in teachers:
-        if teacher not in u_teachers:
-            sql.add_user_teacher(u_id, teacher['name'])
+    try:
+        u_id = call.from_user.id
+        u_teachers = sql.get_user_teachers(u_id)
+        data = await state.get_data()
+        teachers = data.get('found_teachers', [])
+        for teacher in teachers:
+            if teacher['id'] not in u_teachers:
+                sql.add_user_teacher(u_id, teacher['name'])
 
-    actual_data = data.get('actual_data')
-    keyboard = get_inline_key_add_info(u_id, actual_data, 'teachers')
-    await call.message.edit_reply_markup(reply_markup=keyboard)
+        actual_data = data.get('actual_data')
+        keyboard = get_inline_key_add_info(u_id, actual_data, 'teachers')
+        await call.message.edit_reply_markup(reply_markup=keyboard)
+    except Exception as e:
+        logger.warning(f'Проблема при добавлении всех групп из подразделения: {e}')
+    finally:
+        await call.answer()
 
 
 async def callback_back_to_teachers(call: types.CallbackQuery, state: FSMContext):
@@ -73,57 +87,80 @@ async def callback_back_to_teachers(call: types.CallbackQuery, state: FSMContext
 
     except Exception as e:
         logger.error(f'Ошибка при возврате в меню с преподавателями: {e}')
+    finally:
+        await call.answer()
 
 
 async def callback_change_add_page(call: types.CallbackQuery, state: FSMContext):
     """Смена страниц в меню добавления преподавателей"""
-    data = await state.get_data()
-    teachers = data.get('found_teachers', [])
-    page = data.get('found_page', 0)
+    try:
+        data = await state.get_data()
+        teachers = data.get('found_teachers', [])
+        page = data.get('found_page', 0)
 
-    if "prev_page_add_" in call.data:
-        page = max(0, page - 1)
-    elif "next_page_add_" in call.data:
-        page = min(len(teachers) // 10, page + 1)
+        if "prev_page_add_" in call.data:
+            page = max(0, page - 1)
+        elif "next_page_add_" in call.data:
+            page = min(len(teachers) // 10, page + 1)
 
-    await state.update_data(found_page=page)
-    await refresh_add_teacher_message(call, state, call.from_user.id)
+        await state.update_data(found_page=page)
+        await refresh_add_teacher_message(call, state, call.from_user.id)
+    except Exception as e:
+        logger.warning(f'Проблема со сменной страницы в меню преподавателями: {e}')
+    finally:
+        await call.answer()
 
 
-async def refresh_add_teacher_message(message_or_query: Union[types.Message, types.CallbackQuery],
+async def refresh_add_teacher_message(event: Union[types.Message, types.CallbackQuery],
                                       state: FSMContext, user_id: int):
     """Обновляет сообщение с меню выбора преподавателей для добавления"""
-    data = await state.get_data()
-    page = data.get('found_page', 0)
-    text = data.get('message', '🎓 Выберите преподавателя:')
-    teachers = data.get('actual_data')
+    try:
+        data = await state.get_data()
+        page = data.get('found_page', 0)
+        text = data.get('message', '🎓 Выберите преподавателя:')
+        teachers = data.get('actual_data')
 
-    keyboard = get_inline_key_add_info(user_id, teachers, "teachers", page)
+        keyboard = get_inline_key_add_info(user_id, teachers, "teachers", page)
 
-    if isinstance(message_or_query, types.Message):
-        await message_or_query.answer(text, reply_markup=keyboard)
-    else:
-        await message_or_query.message.edit_text(text, reply_markup=keyboard)
+        if isinstance(event, types.Message):
+            await event.answer(text, reply_markup=keyboard)
+        else:
+            await event.message.edit_text(text, reply_markup=keyboard)
+    except Exception as e:
+        logger.warning(f'Проблема с обновлениями меню с преподавателями: {e}')
+    finally:
+        if isinstance(event, types.CallbackQuery):
+            await event.answer()
 
 
 def register_add_teachers_handlers(dp: Dispatcher):
     # Добавление одной группы
-    dp.register_callback_query_handler(callback_add_teacher,
-                                       lambda c: c.data.startswith("add_teachers_")  and c.message.chat.type == ChatType.PRIVATE,
-                                       state=MenuStates.TEACHER_EDIT)
+    dp.register_callback_query_handler(
+        callback_add_teacher,
+        lambda c: c.data.startswith("add_teachers_") and c.message.chat.type == ChatType.PRIVATE,
+        state=MenuStates.TEACHER_EDIT
+    )
     # Добавление всех групп
-    dp.register_callback_query_handler(callback_add_all_teachers,
-                                       lambda c: c.data == "add_all_teachers" and c.message.chat.type == ChatType.PRIVATE,
-                                       state=MenuStates.TEACHER_EDIT)
+    dp.register_callback_query_handler(
+        callback_add_all_teachers,
+        lambda c: c.data == "add_all_teachers" and c.message.chat.type == ChatType.PRIVATE,
+        state=MenuStates.TEACHER_EDIT
+    )
     # Отмена добавления
-    dp.register_callback_query_handler(callback_del_teachers,
-                                       lambda c: c.data.startswith('del_teachers_') and c.message.chat.type == ChatType.PRIVATE,
-                                       state=MenuStates.TEACHER_EDIT)
+    dp.register_callback_query_handler(
+        callback_del_teachers,
+        lambda c: c.data.startswith('del_teachers_') and c.message.chat.type == ChatType.PRIVATE,
+        state=MenuStates.TEACHER_EDIT
+    )
     # Навигация
-    dp.register_callback_query_handler(callback_change_add_page,
-                                       lambda c: "prev_page_add_" in c.data or "next_page_add_" in c.data and c.message.chat.type == ChatType.PRIVATE,
-                                       state=MenuStates.TEACHER_EDIT)
+    dp.register_callback_query_handler(
+        callback_change_add_page,
+        lambda c: "prev_page_add_" in c.data or "next_page_add_" in c.data and c.message.chat.type == ChatType.PRIVATE,
+        state=MenuStates.TEACHER_EDIT
+    )
     # Возврат в меню групп
-    dp.register_callback_query_handler(callback_back_to_teachers,
-                                       lambda c: c.data == "back_to_teachers" and c.message.chat.type == ChatType.PRIVATE,
-                                       state=MenuStates.TEACHER_EDIT)
+    dp.register_callback_query_handler(
+        callback_back_to_teachers,
+        lambda c: c.data == "back_to_teachers" and c.message.chat.type == ChatType.PRIVATE,
+        state=MenuStates.TEACHER_EDIT
+    )

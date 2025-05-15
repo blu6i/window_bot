@@ -18,7 +18,7 @@ bot.register_date_handlers(dp)
 bot.register_search_handlers(dp)
 bot.register_link_handlers(dp)
 bot.register_common_handlers(dp)
-bot.register_help_handlers(dp)
+# bot.register_help_handlers(dp)
 
 bot.register_groups_chat_handlers(dp)
 

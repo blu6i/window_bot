@@ -19,8 +19,9 @@ def get_bot():
             _bot = Bot(token=TOKEN)
             logger.info(f'Бот инициализирован')
         except Exception as e:
-            logger.warning(f'Ошибка при инициализации бота: {e}')
+            logger.error(f'Ошибка при инициализации бота: {e}')
     return _bot
+
 
 def get_dp():
     global _dp
@@ -28,7 +29,7 @@ def get_dp():
         try:
             storage = MemoryStorage()
             _dp = Dispatcher(get_bot(), storage=storage)
-            logger.info(f'Бот инициализирован')
+            logger.info(f'Диспетчер инициализирован')
         except Exception as e:
-            logger.warning(f'Ошибка при инициализации бота: {e}')
+            logger.error(f'Ошибка при инициализации диспетчера: {e}')
     return _dp

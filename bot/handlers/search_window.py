@@ -1,11 +1,10 @@
 from typing import Union
 
-from aiogram import Dispatcher
-from aiogram.dispatcher import FSMContext
-from aiogram.types import CallbackQuery, Message, ChatType
+from aiogram import Dispatcher, types
+from aiogram.types import ChatType, InlineKeyboardMarkup, InlineKeyboardButton
 
-from bot.keyboards import get_main_menu
-from sql import get_connection, get_user_groups, get_user_dates, get_group_name
+import sql
+from bot.handlers.common import generate_free_windows_multi, send_result_text
 from utils import logger
 
 # Предопределённые временные интервалы
@@ -20,103 +19,58 @@ PAIR_TIMES = [
 ]
 
 
-def get_free_time(cursor, group_id: list[int], date: str) -> dict[str, list[str]]:
-    """Получить свободные пары по группам на указанную дату"""
-    free_slots = {}
-    # Обход всех групп
-    for id_ in group_id:
-        cursor.execute("""
-            SELECT Time FROM Schedule
-            WHERE GroupID = ? AND Date = ?
-        """, (id_, date))
-        occupied_times = {row[0] for row in cursor.fetchall()}
-        # Формирование массива с временем, которого нет в БД
-        free_times = [t for t in PAIR_TIMES if t not in occupied_times]
-        group_name = get_group_name(id_)
-        free_slots[group_name] = free_times
+# =======[Вывод свободных окон для дефолт пользователя]=======
+async def search_window_user_handler(event: Union[types.CallbackQuery, types.Message]):
+    """Вывод окон для простых смертных"""
+    markup = InlineKeyboardMarkup()
+    markup.add(InlineKeyboardButton("🔙 Назад", callback_data="back_to_menu"))
+    try:
+        u_id = event.from_user.id
+        dates = sql.get_user_dates(u_id)
+        group_ids = sql.get_user_groups(u_id)
+        teacher_ids = sql.get_user_teachers(u_id)
+        # Проверка данных пользователя
+        if not dates:
+            await send_result_text(event,
+                                   "⚠️ Вы не указали дату!",
+                                   reply_markup=markup)
+            return
+        elif not group_ids:
+            await send_result_text(event,
+                                   "⚠️ Вы не указали группы!",
+                                   reply_markup=markup)
+            return
 
-    return free_slots
+        # Генерация свободных окон
+        free_windows = generate_free_windows_multi(group_ids, teacher_ids, dates)
 
-
-def get_set_free_time(free_slots: dict[str, list[str]]) -> set[str]:
-    """Пересечение свободных временных окон для всех групп"""
-    if not free_slots:
-        return set()
-
-    group_names = list(free_slots.keys())
-    common_slots = set(free_slots[group_names[0]])
-
-    for group in group_names[1:]:
-        common_slots &= set(free_slots[group])
-
-    return common_slots
-
-
-async def search_window_handler(event: Union[CallbackQuery, Message], state: FSMContext):
-    """Обработка поиска свободных окон (по кнопке или команде)"""
-    u_id = event.from_user.id
-
-    u_groups = get_user_groups(u_id)
-    u_dates = get_user_dates(u_id)
-    text_menu = "🏠 Главное меню\n\nВыберите нужный раздел"
-    if not u_groups or not u_dates:
-        text = "⚠️ Пожалуйста, добавьте хотя бы одну группу и дату перед поиском окон."
-
-        if isinstance(event, CallbackQuery):
-            await event.message.edit_text(text)
-            await event.message.answer(text_menu,
-                                       reply_markup=get_main_menu(u_id))
+        # Формируем текст результата
+        if not free_windows:
+            result_text = "❌ Свободных окон не найдено."
         else:
-            await event.answer(text)
-            await event.answer(text_menu,
-                               reply_markup=get_main_menu(u_id))
-        return
+            result_lines = ["🪟 <b>Свободные окна:</b>"]
+            for date, times in free_windows.items():
+                result_lines.append(f"\n📅 <b>{date}</b>")
+                for time in times:
+                    result_lines.append(f"🕒 {time}")
+            result_text = "\n".join(result_lines)
 
-    # Формируем текст окон
-    conn = get_connection()
-    cursor = conn.cursor()
-    results = []
+        # Отправка сообщения
+        await send_result_text(event, result_text, reply_markup=markup)
 
-    for date in u_dates:
-        free_slots = get_free_time(cursor, u_groups, date)
-        common_slots = get_set_free_time(free_slots)
-
-        if not common_slots:
-            results.append(f"📅 {date}: свободных окон нет")
-        else:
-            slots = '\n'.join(sorted(common_slots))
-            results.append(f"📅 {date}:\n{slots}\n")
-
-    text_windows = "\n".join(results)
-
-    if isinstance(event, CallbackQuery):
-        await event.answer()
-        try:
-            # Сообщение с окнами
-            await event.message.edit_text(text_windows)
-            # Главное меню
-            menu_msg = await event.message.answer(text_menu, reply_markup=get_main_menu(u_id))
-            await state.update_data(last_msg=menu_msg.message_id)
-        except Exception as e:
-            logger.error(f"Ошибка при выводе окон: {e}")
-    else:
-        # Сообщение с окнами
-        await event.answer(text_windows)
-
-        # Главное меню
-        menu_msg = await event.answer(text_menu, reply_markup=get_main_menu(u_id))
-        await state.update_data(last_msg=menu_msg.message_id)
+    except Exception as e:
+        logger.warning(f"Произошла ошибка при выводе окон обычному пользователю: {e}")
 
 
 def register_search_handlers(dp: Dispatcher):
     # Вывод окон
     dp.register_callback_query_handler(
-        search_window_handler,
+        search_window_user_handler,
         lambda c: c.data == "menu_windows" and c.message.chat.type == ChatType.PRIVATE,
         state="*"
     )
     dp.register_message_handler(
-        search_window_handler,
+        search_window_user_handler,
         chat_type=ChatType.PRIVATE,
         commands=["windows"],
         state="*"
