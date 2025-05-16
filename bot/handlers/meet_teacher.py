@@ -53,7 +53,6 @@ async def show_meeting_dates(message: types.Message, state: FSMContext, sub_text
     try:
         async with state.proxy() as data:
             dates = list(data['meetings'].keys())
-            index = data['current_date_index']
 
         kb = types.InlineKeyboardMarkup(row_width=2)
 
@@ -61,15 +60,6 @@ async def show_meeting_dates(message: types.Message, state: FSMContext, sub_text
         for i, date in enumerate(dates):
             icon = "🕒" if datetime.strptime(date, "%Y-%m-%d").date() >= datetime.now().date() else "✅"
             kb.add(types.InlineKeyboardButton(f"{icon} {date}", callback_data=f"view_date_{date}"))
-
-        # Навигация
-        nav_buttons = []
-        if index > 0:
-            nav_buttons.append(types.InlineKeyboardButton("⬅ Назад", callback_data="prev_date"))
-        if index < len(dates) - 1:
-            nav_buttons.append(types.InlineKeyboardButton("Вперед ➡", callback_data="next_date"))
-        if nav_buttons:
-            kb.row(*nav_buttons)
 
         kb.add(types.InlineKeyboardButton("🔙 Назад в меню", callback_data="back_to_menu"))
 
@@ -171,7 +161,7 @@ async def show_meet_details(msg: types.Message, state: FSMContext, sub_text: str
 ⚡ <b>Инициатор:</b>\n{initiator_name}\n
 📅 <b>Дата:</b>\n{date}
 ⏰ <b>Время:</b>\n{time}\n
-🏫 <b>Аудитория:</b>\n{cabinet_info}
+🗺️ <b>Место проведение:</b>\n{cabinet_info}
 👥 <b>Группы:</b>\n{group_names}
 🧑‍🏫 <b>Преподаватели:</b>\n{teacher_names}
 💬 <b>Комментарий:</b>\n{comment or '-'}
@@ -353,7 +343,7 @@ async def send_reminder(call: types.CallbackQuery, state: FSMContext):
                 f"🔔 Напоминание о встрече:\n"
                 f"📅 Дата:\n{date}\n"
                 f"⏰ Время:\n{time}\n\n"
-                f"🏫 Аудитория:\n{cabinet or 'Не указана'}\n\n"
+                f"🗺️ Место проведение:\n{cabinet or 'Не указана'}\n\n"
                 f"👥 Группа:{group_name}\n"
                 f"👩🏻‍🏫 Преподаватель:{teacher_name}\n\n"
                 f"💬 Комментарий:\n{comment or 'Не указан'}"
@@ -539,7 +529,9 @@ async def change_room(call: types.CallbackQuery, state: FSMContext):
 
         await MenuStates.EDIT_MEET_ROOM.set()
         await call.message.edit_text(
-            f"Текущая аудитория: {current_room}\n\nВведите новую аудиторию:",
+            f"Текущее место проведение: {current_room}\n"
+            f"\n"
+            f"Введите новое место проведение:",
             reply_markup=InlineKeyboardMarkup().add(
                 InlineKeyboardButton("🔙 Назад", callback_data="back_to_editor")
             )
@@ -554,14 +546,16 @@ async def process_room_input(msg: types.Message, state: FSMContext):
     """Проверка ввода"""
     try:
         room = msg.text.strip()
-        if not re.match(r"^\d{1,2}-\d{3}[а-яa-z_]?$", room, re.IGNORECASE):
+        """if not re.match(r"^\d{1,2}-\d{3}[а-яa-z_]?$", room, re.IGNORECASE):
             await msg.answer("❌ Неверный формат аудитории. Пример: 11-213, 1-003_, 5-312а")
-            return
+            return"""
 
         await state.update_data(room=room)
 
         await msg.answer(
-            f"✅ Аудитория изменена на: {room}\n\nВведите другую или нажмите 'Назад' для возврата:",
+            f"✅ Место проведение изменено на: {room}\n"
+            f"\n"
+            f"Введите другое или нажмите 'Назад' для возврата:",
             reply_markup=InlineKeyboardMarkup().add(
                 InlineKeyboardButton("🔙 Назад", callback_data="back_to_editor")
             )

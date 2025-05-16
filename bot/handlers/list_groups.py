@@ -36,7 +36,7 @@ async def add_group(msg: types.Message, state: FSMContext):
     # Получение ИД последнего сообщения с кнопками
     data = await state.get_data()
     # 1. Проверка: пользователь ввел ПОЛНУЮ группу
-    if group in sql.get_all_groups():
+    if group.lower() in sql.get_all_groups():
         if group in u_groups:
             await msg.answer(f"⚠️ Группа «{group}» уже добавлена.")
         else:
@@ -48,6 +48,7 @@ async def add_group(msg: types.Message, state: FSMContext):
     elif sql.is_check_entity(group):
         # Нашли сущность — выводим все группы по факультету/институту
         groups = sql.get_groups(group)
+        print(groups)
         await state.update_data(found_groups=groups)
         await state.update_data(actual_data=group)
         # Генерация клавиатуры добавления групп
@@ -125,6 +126,7 @@ def register_groups_handlers(dp: Dispatcher):
     dp.register_message_handler(
         show_groups,
         commands=["groups"],
+        content_types=types.ContentTypes.TEXT,
         state="*"
     )
     # Навигация
@@ -144,5 +146,6 @@ def register_groups_handlers(dp: Dispatcher):
         add_group,
         lambda m: not m.text.startswith('/'),
         chat_type=ChatType.PRIVATE,
+        content_types=types.ContentTypes.TEXT,
         state=MenuStates.GROUP_EDIT
     )

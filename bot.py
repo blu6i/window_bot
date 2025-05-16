@@ -18,6 +18,8 @@ bot.register_date_handlers(dp)
 bot.register_search_handlers(dp)
 bot.register_link_handlers(dp)
 bot.register_common_handlers(dp)
+bot.register_testing_handlers(dp)
+bot.register_start_handlers(dp)
 # bot.register_help_handlers(dp)
 
 bot.register_groups_chat_handlers(dp)
@@ -27,7 +29,9 @@ if __name__ == "__main__":
     conn = get_connection()
     build_sql()
     try:
-        executor.start_polling(dp, skip_updates=True)
+        executor.start_polling(dp,
+                               skip_updates=True,
+                               allowed_updates=["message", "callback_query", "chat_member"])
     finally:
         conn.close()
         logger.info('Соединение закрыто')

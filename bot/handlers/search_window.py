@@ -73,5 +73,6 @@ def register_search_handlers(dp: Dispatcher):
         search_window_user_handler,
         chat_type=ChatType.PRIVATE,
         commands=["windows"],
+        content_types=types.ContentTypes.TEXT,
         state="*"
     )

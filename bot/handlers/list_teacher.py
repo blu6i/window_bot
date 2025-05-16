@@ -149,6 +149,7 @@ def register_teachers_handlers(dp: Dispatcher):
     dp.register_message_handler(
         show_teachers,
         commands=["groups"],
+        content_types=types.ContentTypes.TEXT,
         state="*"
     )
     # Навигация
@@ -169,5 +170,6 @@ def register_teachers_handlers(dp: Dispatcher):
         add_teacher,
         lambda m: not m.text.startswith('/'),
         chat_type=ChatType.PRIVATE,
+        content_types=types.ContentTypes.TEXT,
         state=MenuStates.TEACHER_EDIT
     )

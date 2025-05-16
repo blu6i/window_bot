@@ -45,24 +45,24 @@ def is_check_entity(search_str: str) -> bool:
     # Проверка по факультетам
     cursor.execute("""
         SELECT 1 FROM Faculties 
-        WHERE FacultyName = ? OR ShortName = ?
-    """, (search_str, search_str))
+        WHERE FacultyNameLow = ? OR ShortNameLow = ?
+    """, (search_str.lower(), search_str.lower(),))
     if cursor.fetchone():
         return True
 
     # Проверка по институтам
     cursor.execute("""
         SELECT 1 FROM Institutes 
-        WHERE FullName = ? OR ShortName = ?
-    """, (search_str, search_str))
+        WHERE FullNameLow = ? OR ShortNameLow = ?
+    """, (search_str.lower(), search_str.lower(),))
     if cursor.fetchone():
         return True
 
     # Проверка по специальностям
     cursor.execute("""
         SELECT 1 FROM Specializations 
-        WHERE SpecializationName = ? OR ShortName = ?
-    """, (search_str, search_str))
+        WHERE SpecializationNameLow = ? OR ShortNameLow = ?
+    """, (search_str.lower(), search_str.lower(),))
     if cursor.fetchone():
         return True
 
@@ -89,16 +89,16 @@ def get_groups(name: str) -> list[str]:
     JOIN Specializations S ON G.SpecializationID = S.SpecializationID
     JOIN Faculties F ON S.FacultyID = F.FacultyID
     JOIN Institutes I ON F.InstituteID = I.InstituteID
-    WHERE S.SpecializationName = ?
-       OR S.ShortName = ?
-       OR F.FacultyName = ?
-       OR F.ShortName = ?
-       OR I.FullName = ?
-       OR I.ShortName = ?
+    WHERE S.SpecializationNameLow = ?
+       OR S.ShortNameLow = ?
+       OR F.FacultyNameLow = ?
+       OR F.ShortNameLow = ?
+       OR I.FullNameLow = ?
+       OR I.ShortNameLow = ?
        OR G.GroupName = ?
     """
 
-    cursor.execute(query, (name, name, name, name, name, name, name))
+    cursor.execute(query, (name.lower(), name.lower(), name.lower(), name.lower(), name.lower(), name.lower(), name))
     rows = cursor.fetchall()
 
     return [row[0] for row in rows]
@@ -124,16 +124,16 @@ def get_groups_id(name: str) -> list[int]:
     JOIN Specializations S ON G.SpecializationID = S.SpecializationID
     JOIN Faculties F ON S.FacultyID = F.FacultyID
     JOIN Institutes I ON F.InstituteID = I.InstituteID
-    WHERE S.SpecializationName = ?
-       OR S.ShortName = ?
-       OR F.FacultyName = ?
-       OR F.ShortName = ?
-       OR I.FullName = ?
-       OR I.ShortName = ?
+    WHERE S.SpecializationNameLow = ?
+       OR S.ShortNameLow = ?
+       OR F.FacultyNameLow = ?
+       OR F.ShortNameLow = ?
+       OR I.FullNameLow = ?
+       OR I.ShortNameLow = ?
        OR G.GroupName = ?
     """
 
-    cursor.execute(query, (name, name, name, name, name, name, name))
+    cursor.execute(query, (name.lower(), name.lower(), name.lower(), name.lower(), name.lower(), name.lower(), name))
     rows = cursor.fetchall()
 
     return [row[0] for row in rows]
@@ -145,7 +145,7 @@ def get_all_groups() -> list[str]:
     cursor = conn.cursor()
 
     # Выполняем запрос, чтобы получить все группы
-    query = "SELECT GroupName FROM Groups"
+    query = "SELECT GroupNameLow FROM Groups"
     cursor.execute(query)
 
     # Получаем результаты
@@ -224,7 +224,7 @@ def is_date_in_schedule(date_str: str) -> bool:
     return result is not None
 
 
-def get_group_hash(group_id: int) -> int:
+def get_group_hash(group_id: int) -> int | None:
     """Получение ID группы по хэшу"""
     conn = get_connection()
     cursor = conn.cursor()

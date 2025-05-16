@@ -86,12 +86,14 @@ def register_authorization_handlers(dp: Dispatcher):
         authorization_teacher,
         lambda m: m.text.startswith('!код'),
         chat_type=types.ChatType.PRIVATE,
+        content_types=types.ContentTypes.TEXT,
         state='*'
     )
     dp.register_message_handler(
         unauthorization_teacher,
         lambda m: m.text.startswith('!анкод'),
         chat_type=types.ChatType.PRIVATE,
+        content_types=types.ContentTypes.TEXT,
         state='*'
     )
 
@@ -99,11 +101,13 @@ def register_authorization_handlers(dp: Dispatcher):
         authorization_group,
         lambda m: m.text.startswith("!код"),
         chat_type=[types.ChatType.GROUP, types.ChatType.SUPERGROUP],
+        content_types=types.ContentTypes.TEXT,
         state="*"
     )
     dp.register_message_handler(
         unauthorization_group,
         lambda m: m.text.startswith("!анкод"),
         chat_type=[types.ChatType.GROUP, types.ChatType.SUPERGROUP],
+        content_types=types.ContentTypes.TEXT,
         state="*"
     )

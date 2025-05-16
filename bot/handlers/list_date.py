@@ -50,40 +50,32 @@ async def add_date(msg: types.Message, state: FSMContext):
         try:
             date = date_format_db(text)
         except ValueError:
-            await msg.bot.edit_message_text("⚠️ Некорректный формат даты или такой даты не существует в календаре. "
-                                            "\n\nФормат даты должен быть: DD, DD.\u200BMM или DD.MM.YYYY",
-                                            chat_id=msg.chat.id,
-                                            message_id=last_msg_id,
-                                            reply_markup=get_inline_key_list(u_id, "date")
-                                            )
+            await msg.answer("⚠️ Некорректный формат даты или такой даты не существует в календаре. "
+                             "\n\nФормат даты должен быть: DD, DD.\u200BMM или DD.MM.YYYY",
+                             reply_markup=get_inline_key_list(u_id, "date")
+                             )
             return
 
         # Проверка: есть ли вообще такая дата в БД расписания
         if not sql.is_date_in_schedule(date):
-            await msg.bot.edit_message_text(f"⚠️ На {date} нет расписания.",
-                                            chat_id=msg.chat.id,
-                                            message_id=last_msg_id,
-                                            reply_markup=get_inline_key_list(u_id, "date")
-                                            )
+            await msg.answer(f"⚠️ На {date} нет расписания.",
+                             reply_markup=get_inline_key_list(u_id, "date")
+                             )
             return
 
         u_id = msg.from_user.id
         u_dates = sql.get_user_dates(u_id)
 
         if date in u_dates:
-            await msg.bot.edit_message_text(f"⚠️ Дата {date} уже добавлена.",
-                                            chat_id=msg.chat.id,
-                                            message_id=last_msg_id,
-                                            reply_markup=get_inline_key_list(u_id, "date")
-                                            )
+            await msg.answer(f"⚠️ Дата {date} уже добавлена.",
+                             reply_markup=get_inline_key_list(u_id, "date")
+                             )
             return
 
         sql.add_user_date(u_id, date)
-        await msg.bot.edit_message_text(f"✅ Дата {date} добавлена.",
-                                        chat_id=msg.chat.id,
-                                        message_id=last_msg_id,
-                                        reply_markup=get_inline_key_list(u_id, "date")
-                                        )
+        await msg.answer(f"✅ Дата {date} добавлена.",
+                         reply_markup=get_inline_key_list(u_id, "date")
+                         )
         await state.update_data(last_msg=last_msg_id)
     except Exception as e:
         logger.warning(f'Ошибка при добавлении даты: {e}')
@@ -192,6 +184,7 @@ def register_date_handlers(dp: Dispatcher):
         show_dates,
         commands=['dates'],
         chat_type=ChatType.PRIVATE,
+        content_types=types.ContentTypes.TEXT,
         state="*"
     )
     # Добавление даты
@@ -199,6 +192,7 @@ def register_date_handlers(dp: Dispatcher):
         add_date,
         lambda m: not m.text.startswith('/'),
         chat_type=ChatType.PRIVATE,
+        content_types=types.ContentTypes.TEXT,
         state=MenuStates.DATE_EDIT
     )
     # Удаление даты

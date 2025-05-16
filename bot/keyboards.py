@@ -208,11 +208,11 @@ def get_inline_key_add_info(u_id: int, data: str, type_: str, page: int = 0) -> 
 def get_edit_meeting_menu():
     keyboard = InlineKeyboardMarkup(row_width=1)
     keyboard.add(
-        InlineKeyboardButton("✏️ Редактировать дату и время", callback_data="change_date_page"),
-        InlineKeyboardButton("🏫 Редактировать аудиторию", callback_data="edit_room"),
-        InlineKeyboardButton("💬 Редактировать комментарий", callback_data="edit_comment"),
-        InlineKeyboardButton("✅ Подтвердить изменения", callback_data="confirm_changes"),
-        InlineKeyboardButton("❌ Отменить изменения", callback_data="cancel_changes")
+        InlineKeyboardButton("✏️ Изменить дату и время", callback_data="change_date_page"),
+        InlineKeyboardButton("🗺️ Изменить место", callback_data="edit_room"),
+        InlineKeyboardButton("💬 Изменить комментарий", callback_data="edit_comment"),
+        InlineKeyboardButton("✅ Подтвердить", callback_data="confirm_changes"),
+        InlineKeyboardButton("❌ Отменить", callback_data="cancel_changes")
     )
     return keyboard
 
@@ -286,7 +286,7 @@ def get_free_windows_keyboard(
 def generate_edit_menu_keyboard(cabinet: str = None, comment: str = None) -> InlineKeyboardMarkup:
     kb = InlineKeyboardMarkup()
 
-    audi_text = "🏫 Аудитория"
+    audi_text = "🗺️ Место проведение"
     if cabinet:
         audi_text += " ✅"
 

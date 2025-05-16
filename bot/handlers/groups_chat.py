@@ -4,6 +4,8 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 import sql
 from utils import logger
 
+from datetime import datetime
+
 
 async def group_meet(msg: types.Message):
     """Вывод запланированных встреч"""
@@ -19,12 +21,30 @@ async def group_meet(msg: types.Message):
             await msg.reply("📭 Встреч не запланировано.")
             return
 
+        # Текущая дата
+        today = datetime.today().date()
+
+        # Фильтрация актуальных дат
+        actual_dates = []
+        for date_str in dates:
+            try:
+                date_obj = datetime.strptime(date_str, "%Y-%m-%d").date()
+                if date_obj >= today:
+                    actual_dates.append(date_str)
+            except ValueError:
+                logger.warning(f"Невозможно распарсить дату: {date_str}")
+
+        if not actual_dates:
+            await msg.reply("📭 Все встречи уже прошли.")
+            return
+
         keyboard = InlineKeyboardMarkup(row_width=1)
-        for date in dates:
+        for date in actual_dates:
             keyboard.add(InlineKeyboardButton(text=date,
                                               callback_data=f"group_meetings:{date}"))
-        await msg.reply("📅 Выберите дату:",
-                        reply_markup=keyboard)
+
+        await msg.reply("📅 Выберите дату:", reply_markup=keyboard)
+
     except Exception as e:
         logger.warning(f'Проблема с выводом встреч в группе: {e}')
 
@@ -44,11 +64,13 @@ async def show_meetings_for_date(call: types.CallbackQuery):
         text = f"📆 Встречи на {date}:\n"
         for meet in meetings:
             time, comment, cabinet = meet
-            text += f"🕒 {time}\n— Кабинет: {cabinet or '-'}\n— Комментарий: {comment or '-'}\n"
+            text += (f"🕒 Время: {time}\n"
+                     f"— Место проведение: {cabinet or '-'}\n"
+                     f"— Комментарий: {comment or '-'}\n")
 
         await call.message.edit_text(text)
     except Exception as e:
-        logger.warning(f'Проблема с подробным выводом об встрече: {e}')
+        logger.warning(f'Проблема с подробным выводом об встрече в группе: {e}')
     finally:
         await call.answer()
 
@@ -64,5 +86,6 @@ def register_groups_chat_handlers(dp: Dispatcher):
         group_meet,
         lambda m: m.text == "!встречи",
         chat_type=[types.ChatType.GROUP, types.ChatType.SUPERGROUP],
+        content_types=types.ContentTypes.TEXT,
         state="*"
     )

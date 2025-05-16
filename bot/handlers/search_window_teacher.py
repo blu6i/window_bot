@@ -8,7 +8,7 @@ from aiogram.utils.exceptions import MessageNotModified
 
 import sql
 from bot import MenuStates, get_main_menu
-from bot.handlers.common import notify_mp, back_to_main, generate_free_windows_multi
+from bot.handlers.common import notify_mp, back_to_main, generate_free_windows_multi, out_main_menu
 from bot.keyboards import get_free_windows_keyboard, generate_edit_menu_keyboard
 
 
@@ -187,7 +187,7 @@ async def show_edit_menu(event: Union[types.CallbackQuery, types.Message], state
     comment_display = comment if comment else "Не указан"
 
     text = (
-        "🏫 Выбранная аудитория:\n"
+        "🗺️ Место проведение:\n"
         f"{cabinet_display}\n"
         "📢 Ваш комментарий:\n"
         f"{comment_display}\n"
@@ -222,7 +222,7 @@ async def edit_cabinet(callback_query: types.CallbackQuery, state: FSMContext):
 
         await MenuStates.EDIT_AUDI.set()
         await callback_query.message.edit_text(
-            f"Текущая аудитория: {current_room}\n"
+            f"Текущее место проведение: {current_room}\n"
             "\n"
             "Введите новую аудиторию:",
             reply_markup=InlineKeyboardMarkup().add(
@@ -236,16 +236,16 @@ async def edit_cabinet(callback_query: types.CallbackQuery, state: FSMContext):
 async def process_edit_cabinet(message: types.Message, state: FSMContext):
     """Проверка ввода аудитории"""
     cabinet = message.text.strip()
-    if not re.match(r"^\d{1,2}-\d{3}[а-яa-z_]?$", cabinet, re.IGNORECASE):
+    """if not re.match(r"^\d{1,2}-\d{3}[а-яa-z_]?$", cabinet, re.IGNORECASE):
         await message.answer("❌ Неверный формат аудитории. Пример: 11-213, 1-003_, 5-312а")
-        return
+        return"""
 
     await state.update_data(cabinet=cabinet)
 
     await message.answer(
-        f"✅ Аудитория изменена на: {cabinet}\n"
+        f"✅ Место проведение изменено на: {cabinet}\n"
         "\n"
-        "Введите другую или нажмите 'Назад' для возврата:",
+        "Введите другое или нажмите 'Назад' для возврата:",
         reply_markup=InlineKeyboardMarkup().add(
             InlineKeyboardButton("🔙 Назад", callback_data="back_to_edit_menu")
         )
@@ -314,8 +314,8 @@ async def finalize_selection(call: types.CallbackQuery, state: FSMContext):
     # Отправляем на подтверждение
     summary = generate_summary(data, initiator_teacher_name)
     kb = types.InlineKeyboardMarkup()
-    kb.add(types.InlineKeyboardButton("Подтвердить", callback_data="save_final"))
-    kb.add(types.InlineKeyboardButton("Редактировать", callback_data="back_to_edit_menu"))
+    kb.add(types.InlineKeyboardButton("✅ Подтвердить", callback_data="save_final"))
+    kb.add(types.InlineKeyboardButton("🔁 Редактировать", callback_data="back_to_edit_menu"))
 
     await call.message.edit_text(summary, reply_markup=kb)
 
@@ -350,7 +350,7 @@ def generate_summary(data: dict, initiator_teacher_name: str) -> str:
         f"⚡ Инициатор:\n{initiator_teacher_name}\n\n"
         f"📅 Дата:\n{current_date}\n"
         f"⏰ Время:\n{times_str}\n\n"
-        f"🏫 Аудитория:\n{cabinet}\n\n"
+        f"🗺️ Место проведение:\n{cabinet}\n\n"
         f"👥 Группы:\n{groups_str}\n"
         f"🧑‍🏫 Преподаватели:\n{teachers_str}\n"
         f"💬 Комментарий:\n{comment}"
@@ -364,7 +364,7 @@ async def save_final_data(call: types.CallbackQuery, state: FSMContext):
     try:
         u_id = call.from_user.id
         initiator_teacher_id = sql.get_teacher_id_tg(u_id)
-
+        text = ''
         async with state.proxy() as data:
             current_date = data['dates'][data['current_page']]
             times = list(data['selected'][current_date].keys())
@@ -415,7 +415,7 @@ async def save_final_data(call: types.CallbackQuery, state: FSMContext):
             f"⚡ Инициатор:\n{sql.get_teacher_name(initiator_teacher_id)}\n\n"
             f"📅 Дата:\n{current_date}\n"
             f"⏰ Время:\n{', '.join(times)}\n\n"
-            f"🏫 Аудитория:\n{cabinet or 'Не указана'}\n\n"
+            f"🗺️ Место проведение:\n{cabinet or 'Не указана'}\n\n"
             f"👥 Группы:{group_name}\n"
             f"👩🏻‍🏫 Преподаватели:{teacher_name}\n\n"
             f"💬 Комментарий:\n{comment or 'Не указан'}"
@@ -429,24 +429,23 @@ async def save_final_data(call: types.CallbackQuery, state: FSMContext):
 
         # Обратная связь пользователю
         if not unnotified_groups and not unnotified_teachers:
-            await call.message.answer("📬 Уведомление успешно отправлено.")
+            text = "📬 Уведомление успешно отправлено."
         else:
             # Формируем сообщение о тех, кто не был уведомлен
-            not_notified_message = "❗️ Не удалось отправить уведомления следующим участникам:\n"
+            text = ("\n"
+                    "========\n"
+                    "❗️ Не удалось отправить уведомления следующим участникам:\n")
             if unnotified_groups:
-                not_notified_message += f"Группы без чатов:"
+                text += f"Группы без чатов:"
                 for group in unnotified_groups:
-                    not_notified_message += f"\n• {sql.get_group_name(group)}"
+                    text += f"\n• {sql.get_group_name(group)}"
             if unnotified_teachers:
-                not_notified_message += f"\nПреподаватели без TG ID:"
+                text += f"\nПреподаватели без привязки к боту:"
                 for teacher in unnotified_teachers:
-                    not_notified_message += f"\n• {sql.get_teacher_name(teacher)}"
-
-            await call.message.answer(not_notified_message)
+                    text += f"\n• {sql.get_teacher_name(teacher)}"
 
         await state.finish()
-        sent = await call.message.answer("🏠 Главное меню\n\nВыберите нужный раздел",
-                                         reply_markup=get_main_menu(call.from_user.id))
+        sent = await out_main_menu(call, text)
         await state.update_data(last_msg=sent.message_id)
     finally:
         await call.answer()
@@ -512,7 +511,8 @@ def register_windows_list_handlers(dp: Dispatcher):
     dp.register_message_handler(
         save_comment,
         chat_type=ChatType.PRIVATE,
-        state=MenuStates.EDIT_COMMENT
+        state=MenuStates.EDIT_COMMENT,
+        content_types=types.ContentTypes.TEXT
     )
 
     dp.register_callback_query_handler(

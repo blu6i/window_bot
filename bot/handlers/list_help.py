@@ -1,6 +1,6 @@
 from typing import Union
 
-from aiogram import Dispatcher
+from aiogram import Dispatcher, types
 from aiogram.dispatcher import FSMContext
 from aiogram.types import CallbackQuery, Message, ChatType
 
@@ -78,6 +78,7 @@ def register_help_handlers(dp: Dispatcher):
     dp.register_message_handler(send_help,
                                 commands=["help"],
                                 chat_type=ChatType.PRIVATE,
+                                content_types=types.ContentTypes.TEXT,
                                 state='*')
     # Вывод помощи
     dp.register_callback_query_handler(send_help,

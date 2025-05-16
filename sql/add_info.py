@@ -12,6 +12,7 @@ from dotenv import load_dotenv
 
 load_dotenv('../config/.env')
 
+
 def generate_hash(fullname: str) -> str:
     """
     Генерирует хэш на основе полного имени преподавателя и секретного ключа из .env
@@ -501,14 +502,13 @@ def add_schedule(df: pd.DataFrame):
 def add_user_group(user: int, group_name: str) -> bool:
     """
         Добавить пользователю выбранную группу.
-        Если пользователя нет в базе, то сначала добавляем его.
     """
     user_id = get_user_id(user)
 
     conn = get_connection()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT GroupID FROM Groups WHERE GroupName = ?", (group_name,))
+    cursor.execute("SELECT GroupID FROM Groups WHERE GroupNameLow = ?", (group_name.lower(),))
     row = cursor.fetchone()
     if not row:
         return False
@@ -562,7 +562,6 @@ def add_busy_window(current_date, times, group_id, teacher_id, cabinet_id, comme
         conn.commit()
     except Exception as e:
         logger.warning(f'Проблема при добавлении окна: {e}')
-
 
 
 def add_chat_group(group_id: int, chat_id: int):

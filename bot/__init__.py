@@ -13,4 +13,6 @@ from .handlers.autorization import register_authorization_handlers
 from .handlers.search_window_teacher import register_windows_list_handlers
 from .handlers.meet_teacher import register_edit_meet_handlers
 from .handlers.groups_chat import register_groups_chat_handlers
+from .handlers.testing_bot import register_testing_handlers
+from .handlers.start import register_start_handlers
 from .init_bot import get_bot, get_dp
