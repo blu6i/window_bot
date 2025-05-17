@@ -18,14 +18,22 @@ async def show_dates(event: Union[types.CallbackQuery, types.Message], state: FS
         u_dates = sql.get_user_dates(u_id)
 
         if not u_dates:
-            text = "📅 У вас пока нет добавленных дат."
+            text = ("📅 У вас пока нет добавленных дат.\n"
+                    "\n"
+                    "Введите дату формата: *DD*, *DD.\u200BMM* или *DD.MM.YYYY*\n"
+                    "Например: `16.\u200B05`")
         else:
-            text = "📅 Ваши даты:\n\nФормат ввода даты должен быть: DD, DD.\u200BMM или DD.MM.YYYY"
+            text = ("📅 Ваши даты:\n"
+                    "\n"
+                    "Введите дату формата: *DD*, *DD.\u200BMM* или *DD.MM.YYYY*\n"
+                    "Например: `16.\u200B05`")
 
         keyboard = get_inline_key_list(u_id, "date")
 
         if isinstance(event, types.CallbackQuery):
-            sent = await event.message.edit_text(text, reply_markup=keyboard)
+            sent = await event.message.edit_text(text,
+                                                 reply_markup=keyboard,
+                                                 parse_mode="Markdown")
             await event.answer()
         else:
             sent = await event.answer(text, reply_markup=keyboard)
@@ -51,7 +59,8 @@ async def add_date(msg: types.Message, state: FSMContext):
             date = date_format_db(text)
         except ValueError:
             await msg.answer("⚠️ Некорректный формат даты или такой даты не существует в календаре. "
-                             "\n\nФормат даты должен быть: DD, DD.\u200BMM или DD.MM.YYYY",
+                             "\n"
+                             "\nФормат даты должен быть: DD, DD.\u200BMM или DD.MM.YYYY",
                              reply_markup=get_inline_key_list(u_id, "date")
                              )
             return

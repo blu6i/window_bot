@@ -126,6 +126,7 @@ def register_groups_handlers(dp: Dispatcher):
     dp.register_message_handler(
         show_groups,
         commands=["groups"],
+        chat_type=ChatType.PRIVATE,
         content_types=types.ContentTypes.TEXT,
         state="*"
     )
