@@ -36,19 +36,18 @@ async def add_group(msg: types.Message, state: FSMContext):
     # Получение ИД последнего сообщения с кнопками
     data = await state.get_data()
     # 1. Проверка: пользователь ввел ПОЛНУЮ группу
-    if group.lower() in sql.get_all_groups():
+    """if group.lower() in sql.get_all_groups():
         if group in u_groups:
             await msg.answer(f"⚠️ Группа «{group}» уже добавлена.")
         else:
             sql.add_user_group(u_id, group)
             await msg.answer(f"✅ Группа «{group}» добавлена!")
-        await refresh_groups_message(msg, state, u_id)
+        await refresh_groups_message(msg, state, u_id)"""
 
     # 2. Проверка: это факультет/институт/специальность?
-    elif sql.is_check_entity(group):
+    if sql.is_check_entity(group):
         # Нашли сущность — выводим все группы по факультету/институту
         groups = sql.get_groups(group)
-        print(groups)
         await state.update_data(found_groups=groups)
         await state.update_data(actual_data=group)
         # Генерация клавиатуры добавления групп

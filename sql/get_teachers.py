@@ -136,13 +136,11 @@ def is_check_sub(search_str: str) -> bool:
     cursor = conn.cursor()
 
     # Приводим к нижнему регистру для регистронезависимого поиска
-    search_low = search_str.lower()
-
+    pattern = f"{search_str.lower()}%"
     # 1. Проверка по кафедрам
     cursor.execute("""
         SELECT 1 FROM Departament 
-        WHERE DepartamentName = ? OR ShortName = ?
-           OR DepartamentNameLow = ? OR ShortNameLow = ?
+        WHERE OR DepartamentNameLow = ? OR ShortNameLow = ?
     """, (search_str, search_str, search_low, search_low))
     if cursor.fetchone():
         return True

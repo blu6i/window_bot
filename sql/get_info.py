@@ -1,7 +1,5 @@
-import sqlite3
-
 import re
-from datetime import datetime
+import sqlite3
 
 from sql.init_connection import get_connection
 from utils import logger
@@ -37,32 +35,33 @@ def is_check_entity(search_str: str) -> bool:
     """
     conn = get_connection()
     cursor = conn.cursor()
+    pattern = f"{search_str.lower()}%"
     # Проверка формата группы
-    if re.match(PATTERN_GROUP, search_str):
-        cursor.execute("SELECT 1 FROM Groups WHERE GroupName = ?", (search_str,))
-        return cursor.fetchone() is not None
+    cursor.execute("SELECT 1 FROM Groups WHERE GroupNameLow LIKE ?", (pattern,))
+    if cursor.fetchone():
+        return True
 
     # Проверка по факультетам
     cursor.execute("""
         SELECT 1 FROM Faculties 
-        WHERE FacultyNameLow = ? OR ShortNameLow = ?
-    """, (search_str.lower(), search_str.lower(),))
+        WHERE FacultyNameLow LIKE ? OR ShortNameLow LIKE ?
+    """, (pattern.lower(), pattern.lower(),))
     if cursor.fetchone():
         return True
 
     # Проверка по институтам
     cursor.execute("""
         SELECT 1 FROM Institutes 
-        WHERE FullNameLow = ? OR ShortNameLow = ?
-    """, (search_str.lower(), search_str.lower(),))
+        WHERE FullNameLow LIKE ? OR ShortNameLow LIKE ?
+    """, (pattern.lower(), pattern.lower(),))
     if cursor.fetchone():
         return True
 
     # Проверка по специальностям
     cursor.execute("""
         SELECT 1 FROM Specializations 
-        WHERE SpecializationNameLow = ? OR ShortNameLow = ?
-    """, (search_str.lower(), search_str.lower(),))
+        WHERE SpecializationNameLow LIKE ? OR ShortNameLow LIKE ?
+    """, (pattern.lower(), pattern.lower(),))
     if cursor.fetchone():
         return True
 
@@ -73,32 +72,31 @@ def is_check_entity(search_str: str) -> bool:
 def get_groups(name: str) -> list[str]:
     """
     Возвращает список названий групп, которые относятся к переданному названию
-    факультета, института или специальности.
-
-    Args:
-        name: строка (название факультета / института / специальности)
-    Returns:
-        список названий групп
+    факультета / института / специальности, с поддержкой частичного совпадения.
     """
+
     conn = get_connection()
     cursor = conn.cursor()
+    pattern = f"{name.lower()}%"
 
     query = """
-    SELECT G.GroupName
+    SELECT DISTINCT G.GroupName
     FROM Groups G
     JOIN Specializations S ON G.SpecializationID = S.SpecializationID
     JOIN Faculties F ON S.FacultyID = F.FacultyID
     JOIN Institutes I ON F.InstituteID = I.InstituteID
-    WHERE S.SpecializationNameLow = ?
-       OR S.ShortNameLow = ?
-       OR F.FacultyNameLow = ?
-       OR F.ShortNameLow = ?
-       OR I.FullNameLow = ?
-       OR I.ShortNameLow = ?
-       OR G.GroupName = ?
+    WHERE S.SpecializationNameLow LIKE ?
+       OR S.ShortNameLow LIKE ?
+       OR F.FacultyNameLow LIKE ?
+       OR F.ShortNameLow LIKE ?
+       OR I.FullNameLow LIKE ?
+       OR I.ShortNameLow LIKE ?
+       OR G.GroupNameLow LIKE ?
     """
 
-    cursor.execute(query, (name.lower(), name.lower(), name.lower(), name.lower(), name.lower(), name.lower(), name))
+    params = [pattern] * 7
+
+    cursor.execute(query, params)
     rows = cursor.fetchall()
 
     return [row[0] for row in rows]
@@ -117,23 +115,26 @@ def get_groups_id(name: str) -> list[int]:
     """
     conn = get_connection()
     cursor = conn.cursor()
+    pattern = f"{name.lower()}%"
 
     query = """
-    SELECT G.GroupID
+    SELECT DISTINCT G.GroupID
     FROM Groups G
     JOIN Specializations S ON G.SpecializationID = S.SpecializationID
     JOIN Faculties F ON S.FacultyID = F.FacultyID
     JOIN Institutes I ON F.InstituteID = I.InstituteID
-    WHERE S.SpecializationNameLow = ?
-       OR S.ShortNameLow = ?
-       OR F.FacultyNameLow = ?
-       OR F.ShortNameLow = ?
-       OR I.FullNameLow = ?
-       OR I.ShortNameLow = ?
-       OR G.GroupName = ?
+    WHERE S.SpecializationNameLow LIKE ?
+       OR S.ShortNameLow LIKE ?
+       OR F.FacultyNameLow LIKE ?
+       OR F.ShortNameLow LIKE ?
+       OR I.FullNameLow LIKE ?
+       OR I.ShortNameLow LIKE ?
+       OR G.GroupNameLow LIKE ?
     """
 
-    cursor.execute(query, (name.lower(), name.lower(), name.lower(), name.lower(), name.lower(), name.lower(), name))
+    params = [pattern] * 7
+
+    cursor.execute(query, params)
     rows = cursor.fetchall()
 
     return [row[0] for row in rows]

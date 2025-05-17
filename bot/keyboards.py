@@ -163,7 +163,7 @@ def get_inline_key_add_info(u_id: int, data: str, type_: str, page: int = 0) -> 
         for id_ in items_on_page:
             if id_ in not_added_info:
                 keyboard.insert(InlineKeyboardButton(
-                    text=f'❌ {get_group_name(id_)}',
+                    text=f'{get_group_name(id_)}',
                     callback_data=f"add_{type_}_{id_}"
                 ))
             else:
@@ -175,7 +175,7 @@ def get_inline_key_add_info(u_id: int, data: str, type_: str, page: int = 0) -> 
         for id_ in items_on_page:
             if id_ in not_added_info:
                 keyboard.insert(InlineKeyboardButton(
-                    text=f'❌ {sql.get_teacher_name(id_)}',
+                    text=f'{sql.get_teacher_name(id_)}',
                     callback_data=f"add_{type_}_{id_}"
                 ))
             else:
