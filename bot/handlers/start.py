@@ -33,7 +33,7 @@ async def cmd_start(msg: types.Message, state: FSMContext):
     await msg.answer(WELCOME_TEXT,
                      reply_markup=ReplyKeyboardRemove(),
                      parse_mode='HTML')
-    await send_test_auth_message(msg)
+    #await send_test_auth_message(msg)
     await out_main_menu(msg, state)
 
 

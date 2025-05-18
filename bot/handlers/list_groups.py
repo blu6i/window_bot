@@ -49,9 +49,9 @@ async def add_group(msg: types.Message, state: FSMContext):
     group = msg.text.strip()
     u_id = msg.from_user.id
     groups = sql.get_groups(group)
-    groups_name = groups['groups']
-    groups_name.sort()
     if groups:
+        groups_name = groups['groups']
+        groups_name.sort()
         await state.update_data(found_groups=groups_name)
         await state.update_data(actual_data=group)
         if groups['code'] == 3:

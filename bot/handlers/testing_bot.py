@@ -7,15 +7,18 @@ import sql
 from bot.handlers.common import out_main_menu
 
 
-async def send_test_auth_message(msg: types.Message):
-    kb = InlineKeyboardMarkup(row_width=2)
+async def send_test_auth_message(msg: types.CallbackQuery):
+    u_id = msg.from_user.id
+    kb = InlineKeyboardMarkup(row_width=1)
     kb.add(
-        InlineKeyboardButton("Группа для теста", url="https://t.me/+YgiaNeL19443MWNi")
+        InlineKeyboardButton("Группа для теста", url="https://t.me/+dfSpL6mZw_pmNTIy")
     )
     kb.add(
-        InlineKeyboardButton("Рандомный вход", callback_data="test_auth_random_login"),
-        InlineKeyboardButton("Выйти", callback_data="test_auth_logout")
+        InlineKeyboardButton("Рандомный вход", callback_data="test_auth_random_login")
     )
+    if sql.is_teacher_authorized(u_id):
+        kb.add(InlineKeyboardButton("Выйти из аккаунта", callback_data="test_auth_logout"))
+    kb.add(InlineKeyboardButton("Назад", callback_data="back_to_menu"))
 
     text = (
         "*Тестирование бота*\n"
@@ -26,7 +29,7 @@ async def send_test_auth_message(msg: types.Message):
         "- Вы можете временно войти под случайным преподавателем, или выйти, если вы уже авторизованы."
     )
 
-    await msg.answer(text, reply_markup=kb, parse_mode="Markdown")
+    await msg.message.edit_text(text, reply_markup=kb, parse_mode="Markdown")
 
 
 async def handle_random_login(call: types.CallbackQuery, state: FSMContext):
@@ -96,6 +99,12 @@ def register_testing_handlers(dp: Dispatcher):
     dp.register_callback_query_handler(
         handle_logout,
         lambda c: c.data == "test_auth_logout",
+        chat_type=ChatType.PRIVATE,
+        state='*'
+    )
+    dp.register_callback_query_handler(
+        send_test_auth_message,
+        lambda c: c.data == "send_test_auth_message",
         chat_type=ChatType.PRIVATE,
         state='*'
     )

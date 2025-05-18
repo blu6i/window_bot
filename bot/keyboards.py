@@ -43,7 +43,7 @@ def get_main_menu(u_id: int):
     # Доп. строка для админа
     if u_id == int(TOKEN):
         keyboard.row(InlineKeyboardButton("🔄 Обновить расписание", callback_data="refresh_schedule"))
-
+    keyboard.row(InlineKeyboardButton("Для теста", callback_data="send_test_auth_message"))
     return keyboard
 
 
