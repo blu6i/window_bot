@@ -9,6 +9,14 @@ from bot.states import MenuStates
 from utils import logger
 import sql
 
+NULL_LIST = ("👥 Список групп пуст\n"
+             "\n"
+             "ℹ️ Введите шифр группы или название подразделения университета")
+
+NO_NULL_LIST = ("ℹ️ Нажмите на группу, если нужно удалить\n"
+                "\n"
+                "👥 Ваши группы:")
+
 
 # Обработка меню с добавлением групп
 async def callback_add_group(call: types.CallbackQuery, state: FSMContext):
@@ -84,16 +92,9 @@ async def callback_back_to_groups(call: types.CallbackQuery, state: FSMContext):
         u_id = call.from_user.id
         u_groups = sql.get_user_groups(u_id)
         # Редактирование меню с группами
-        if not u_groups:
-            await call.message.edit_text(
-                "👥 У вас пока нет добавленных групп.",
-                reply_markup=get_inline_key_list(u_id, "group")
-            )
-        else:
-            await call.message.edit_text(
-                "👥 Ваши группы:\nНажмите на группу для удаления",
-                reply_markup=get_inline_key_list(u_id, "group")
-            )
+        sub_text = NULL_LIST if not u_groups else NO_NULL_LIST
+        await call.message.edit_text(f"{sub_text}\n",
+                                     reply_markup=get_inline_key_list(u_id, "group"))
 
         # Обновляем состояние
         await state.update_data(last_msg=call.message.message_id)
@@ -110,7 +111,6 @@ async def callback_change_add_page(call: types.CallbackQuery, state: FSMContext)
         data = await state.get_data()
         groups = data.get('found_groups', [])
         page = data.get('found_page', 0)
-
         # Обработка перехода на следующую/предыдущую страницу
         if "prev_page_add_" in call.data:
             page = max(0, page - 1)
@@ -135,12 +135,17 @@ async def refresh_add_group_message(event: Union[types.Message, types.CallbackQu
         data = await state.get_data()
         page = data.get('found_page', 0)
         text = data.get('message', '📚 Выберите группы для добавления:')
+        sub_text = data.get('sub_message', '')
         data = data.get('actual_data')
         keyboard = get_inline_key_add_info(user_id, data, "groups", page)
         if isinstance(event, types.Message):
-            await event.answer(f"{text}", reply_markup=keyboard)
+            await event.answer(f"{sub_text}\n"
+                               f"\n"
+                               f"{text}", reply_markup=keyboard)
         else:
-            await event.message.edit_text(f"{text}", reply_markup=keyboard)
+            await event.message.edit_text(f"{sub_text}\n"
+                                          f"\n"
+                                          f"{text}", reply_markup=keyboard)
     except Exception as e:
         logger.warning(f'Проблема при обновлении сообщения с группами: {e}')
     finally:

@@ -134,7 +134,8 @@ def get_inline_key_add_info(u_id: int, data: str, type_: str, page: int = 0) -> 
     """Генерация клавиатуры выбора групп для добавления, с фильтрацией на лету."""
     if type_ == 'groups':
         # Получаем найденные группы (имена групп)
-        found_info = get_groups_id(data) or []
+        found_info = get_groups_id(data)['groups'] or []
+        found_info.sort()
         # Получаем ID групп, которые у пользователя уже есть
         add_info = get_user_groups(u_id)
     elif type_ == 'teachers':
@@ -160,7 +161,6 @@ def get_inline_key_add_info(u_id: int, data: str, type_: str, page: int = 0) -> 
     items_on_page = found_info[start_i:end_i]
 
     keyboard = InlineKeyboardMarkup(row_width=2)
-
     if type_ == 'groups':
         for id_ in items_on_page:
             if id_ in not_added_info:

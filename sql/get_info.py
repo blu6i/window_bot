@@ -69,75 +69,181 @@ def is_check_entity(search_str: str) -> bool:
 
 
 # Получение имен групп из таблицы с расписанием
-def get_groups(name: str) -> list[str]:
+def get_groups(name: str):
     """
-    Возвращает список названий групп, которые относятся к переданному названию
-    факультета / института / специальности, с поддержкой частичного совпадения.
+    Выполняет поиск групп по иерархии:
+    1. По институту
+    2. По факультету
+    3. По специальности
+    4. По названию группы
+    5. Ничего не найдено = None
     """
-
     conn = get_connection()
     cursor = conn.cursor()
+
     pattern = f"{name.lower()}%"
 
-    query = """
-    SELECT DISTINCT G.GroupName
-    FROM Groups G
-    JOIN Specializations S ON G.SpecializationID = S.SpecializationID
-    JOIN Faculties F ON S.FacultyID = F.FacultyID
-    JOIN Institutes I ON F.InstituteID = I.InstituteID
-    WHERE S.SpecializationNameLow LIKE ?
-       OR S.ShortNameLow LIKE ?
-       OR F.FacultyNameLow LIKE ?
-       OR F.ShortNameLow LIKE ?
-       OR I.FullNameLow LIKE ?
-       OR I.ShortNameLow LIKE ?
-       OR G.GroupNameLow LIKE ?
+    # 1. Поиск по институту
+    query_institute = """
+        SELECT DISTINCT G.GroupName, I.FullName
+        FROM Groups G
+        JOIN Specializations S ON G.SpecializationID = S.SpecializationID
+        JOIN Faculties F ON S.FacultyID = F.FacultyID
+        JOIN Institutes I ON F.InstituteID = I.InstituteID
+        WHERE I.FullNameLow LIKE ? OR I.ShortNameLow LIKE ?
     """
-
-    params = [pattern] * 7
-
-    cursor.execute(query, params)
+    cursor.execute(query_institute, (pattern, pattern))
     rows = cursor.fetchall()
+    if rows:
+        groups = list({row[0] for row in rows})  # Убираем дубликаты
+        institute_name = rows[0][1]
+        return {
+            "groups": groups,
+            "code": 0,
+            "related": institute_name
+        }
 
-    return [row[0] for row in rows]
+    # 2. Поиск по факультету
+    query_faculty = """
+        SELECT DISTINCT G.GroupName, F.FacultyName
+        FROM Groups G
+        JOIN Specializations S ON G.SpecializationID = S.SpecializationID
+        JOIN Faculties F ON S.FacultyID = F.FacultyID
+        WHERE F.FacultyNameLow LIKE ? OR F.ShortNameLow LIKE ?
+    """
+    cursor.execute(query_faculty, (pattern, pattern))
+    rows = cursor.fetchall()
+    if rows:
+        groups = list({row[0] for row in rows})
+        faculty_name = rows[0][1]
+        return {
+            "groups": groups,
+            "code": 1,
+            "related": faculty_name
+        }
+
+    # 3. Поиск по специальности
+    query_specialization = """
+        SELECT DISTINCT G.GroupName, S.SpecializationName
+        FROM Groups G
+        JOIN Specializations S ON G.SpecializationID = S.SpecializationID
+        WHERE S.SpecializationNameLow LIKE ? OR S.ShortNameLow LIKE ?
+    """
+    cursor.execute(query_specialization, (pattern, pattern))
+    rows = cursor.fetchall()
+    if rows:
+        groups = list({row[0] for row in rows})
+        specialization_name = rows[0][1]
+        return {
+            "groups": groups,
+            "code": 2,
+            "related": specialization_name
+        }
+
+    # 4. Поиск по группе
+    query_group = """
+        SELECT DISTINCT GroupName FROM Groups WHERE GroupNameLow LIKE ?
+    """
+    cursor.execute(query_group, (pattern,))
+    groups = cursor.fetchall()
+    if groups:
+        return {
+            "groups": [g[0] for g in groups],
+            "code": 3,
+            "related": None
+        }
+
+    # Ничего не найдено
+    return None
 
 
 # Получение ид групп из таблицы с расписанием
-def get_groups_id(name: str) -> list[int]:
+def get_groups_id(name: str):
     """
-    Возвращает список названий групп, которые относятся к переданному названию
-    факультета, института или специальности.
-
-    Args:
-        name: строка (название факультета / института / специальности)
-    Returns:
-        список названий групп
+    Выполняет поиск групп по иерархии:
+    1. По институту
+    2. По факультету
+    3. По специальности
+    4. По названию группы
+    5. Ничего не найдено = None
     """
     conn = get_connection()
     cursor = conn.cursor()
+
     pattern = f"{name.lower()}%"
 
-    query = """
-    SELECT DISTINCT G.GroupID
-    FROM Groups G
-    JOIN Specializations S ON G.SpecializationID = S.SpecializationID
-    JOIN Faculties F ON S.FacultyID = F.FacultyID
-    JOIN Institutes I ON F.InstituteID = I.InstituteID
-    WHERE S.SpecializationNameLow LIKE ?
-       OR S.ShortNameLow LIKE ?
-       OR F.FacultyNameLow LIKE ?
-       OR F.ShortNameLow LIKE ?
-       OR I.FullNameLow LIKE ?
-       OR I.ShortNameLow LIKE ?
-       OR G.GroupNameLow LIKE ?
+    # 1. Поиск по институту
+    query_institute = """
+        SELECT DISTINCT G.GroupID, I.FullName
+        FROM Groups G
+        JOIN Specializations S ON G.SpecializationID = S.SpecializationID
+        JOIN Faculties F ON S.FacultyID = F.FacultyID
+        JOIN Institutes I ON F.InstituteID = I.InstituteID
+        WHERE I.FullNameLow LIKE ? OR I.ShortNameLow LIKE ?
     """
-
-    params = [pattern] * 7
-
-    cursor.execute(query, params)
+    cursor.execute(query_institute, (pattern, pattern))
     rows = cursor.fetchall()
+    if rows:
+        groups = list({row[0] for row in rows})  # Убираем дубликаты
+        institute_name = rows[0][1]
+        return {
+            "groups": groups,
+            "code": 0,
+            "related": institute_name
+        }
 
-    return [row[0] for row in rows]
+    # 2. Поиск по факультету
+    query_faculty = """
+        SELECT DISTINCT G.GroupID, F.FacultyName
+        FROM Groups G
+        JOIN Specializations S ON G.SpecializationID = S.SpecializationID
+        JOIN Faculties F ON S.FacultyID = F.FacultyID
+        WHERE F.FacultyNameLow LIKE ? OR F.ShortNameLow LIKE ?
+    """
+    cursor.execute(query_faculty, (pattern, pattern))
+    rows = cursor.fetchall()
+    if rows:
+        groups = list({row[0] for row in rows})
+        faculty_name = rows[0][1]
+        return {
+            "groups": groups,
+            "code": 1,
+            "related": faculty_name
+        }
+
+    # 3. Поиск по специальности
+    query_specialization = """
+        SELECT DISTINCT G.GroupID, S.SpecializationName
+        FROM Groups G
+        JOIN Specializations S ON G.SpecializationID = S.SpecializationID
+        WHERE S.SpecializationNameLow LIKE ? OR S.ShortNameLow LIKE ?
+    """
+    cursor.execute(query_specialization, (pattern, pattern))
+    rows = cursor.fetchall()
+    if rows:
+        groups = list({row[0] for row in rows})
+        specialization_name = rows[0][1]
+        return {
+            "groups": groups,
+            "code": 2,
+            "related": specialization_name
+        }
+
+    # 4. Поиск по группе
+    query_group = """
+        SELECT DISTINCT GroupID FROM Groups WHERE GroupNameLow LIKE ?
+    """
+    cursor.execute(query_group, (pattern,))
+    groups = cursor.fetchall()
+    if groups:
+        return {
+            "groups": [g[0] for g in groups],
+            "code": 3,
+            "related": None
+        }
+
+    # Ничего не найдено
+    return None
 
 
 def get_all_groups() -> list[str]:

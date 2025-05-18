@@ -2,6 +2,7 @@ import hashlib
 import os
 import sqlite3
 from datetime import datetime
+from typing import Dict, Any
 
 import pandas as pd
 
@@ -499,7 +500,7 @@ def add_schedule(df: pd.DataFrame):
 
 
 # Добавление группы пользователю
-def add_user_group(user: int, group_name: str) -> bool:
+def add_user_group(user: int, group_name: str) -> bool | dict[str, bool | Any]:
     """
         Добавить пользователю выбранную группу.
     """
@@ -508,7 +509,7 @@ def add_user_group(user: int, group_name: str) -> bool:
     conn = get_connection()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT GroupID FROM Groups WHERE GroupNameLow = ?", (group_name.lower(),))
+    cursor.execute("SELECT GroupID FROM Groups WHERE GroupNameLow LIKE ?", (f"{group_name.lower()}%",))
     row = cursor.fetchone()
     if not row:
         return False
@@ -520,7 +521,12 @@ def add_user_group(user: int, group_name: str) -> bool:
         (user_id, group_id)
     )
     conn.commit()
-    return True
+    if cursor.rowcount == 0:
+        return {'flag': False,
+                'group_id': row[0]}
+    else:
+        return {'flag': True,
+                'group_id': row[0]}
 
 
 # Добавление даты пользователю
