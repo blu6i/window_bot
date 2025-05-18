@@ -76,41 +76,186 @@ def get_teacher_name(teacher_id: int) -> str | None:
         return None
 
 
-def get_teachers_sub(name: str) -> list[dict]:
+def get_teachers_sub(name: str):
     """
-    Возвращает список преподавателей, относящихся к указанному институту,
-    факультету или кафедре.
-
-    Args:
-        name (str): название института / факультета / кафедры
-
-    Returns:
-        list[dict]: список преподавателей в формате {'name': ..., 'id': ...}
+    Выполняет поиск преподавателей по иерархии:
+    1. По институту
+    2. По факультету
+    3. По кафедре
+    4. По имени преподавателя
+    5. Ничего не найдено → None
     """
     conn = get_connection()
     cursor = conn.cursor()
+
     pattern = f"{name.lower()}%"
 
-    query = """
-    SELECT T.FullName, T.TeacherID
-    FROM Teachers T
-    JOIN Departament D ON T.DepartamentID = D.DepartamentID
-    JOIN Faculties F ON D.FacultyID = F.FacultyID
-    JOIN Institutes I ON F.InstituteID = I.InstituteID
-    WHERE I.FullName LIKE ? OR I.ShortName LIKE ?
-       OR F.FacultyName LIKE ? OR F.ShortName LIKE ?
-       OR D.DepartamentName LIKE ? OR D.ShortName LIKE ?
-       OR I.FullNameLow LIKE ? OR I.ShortNameLow LIKE ?
-       OR F.FacultyNameLow LIKE ? OR F.ShortNameLow LIKE ?
-       OR D.DepartamentNameLow LIKE ? OR D.ShortNameLow LIKE ?
-       OR T.TeacherFullNameLow LIKE ?
-    GROUP BY T.TeacherID
+    # 1. Поиск по институту
+    query_institute = """
+        SELECT DISTINCT T.FullName, I.FullName
+        FROM Teachers T
+        JOIN Departament D ON T.DepartamentID = D.DepartamentID
+        JOIN Faculties F ON D.FacultyID = F.FacultyID
+        JOIN Institutes I ON F.InstituteID = I.InstituteID
+        WHERE I.FullNameLow LIKE ? OR I.ShortNameLow LIKE ?
     """
-    params = [pattern] * 13
-    cursor.execute(query, params)
-
+    cursor.execute(query_institute, (pattern, pattern))
     rows = cursor.fetchall()
-    return [{"name": row[0], "id": row[1]} for row in rows]
+    if rows:
+        teachers = [row[0] for row in rows]
+        institute_name = rows[0][1]
+        return {
+            "teachers": teachers,
+            "code": 0,
+            "related": institute_name
+        }
+
+    # 2. Поиск по факультету
+    query_faculty = """
+        SELECT DISTINCT T.FullName, F.FacultyName
+        FROM Teachers T
+        JOIN Departament D ON T.DepartamentID = D.DepartamentID
+        JOIN Faculties F ON D.FacultyID = F.FacultyID
+        WHERE F.FacultyNameLow LIKE ? OR F.ShortNameLow LIKE ?
+    """
+    cursor.execute(query_faculty, (pattern, pattern))
+    rows = cursor.fetchall()
+    if rows:
+        teachers = [row[0] for row in rows]
+        faculty_name = rows[0][1]
+        return {
+            "teachers": teachers,
+            "code": 1,
+            "related": faculty_name
+        }
+
+    # 3. Поиск по кафедре
+    query_department = """
+        SELECT DISTINCT T.FullName, D.DepartamentName
+        FROM Teachers T
+        JOIN Departament D ON T.DepartamentID = D.DepartamentID
+        WHERE D.DepartamentNameLow LIKE ? OR D.ShortNameLow LIKE ?
+    """
+    cursor.execute(query_department, (pattern, pattern))
+    rows = cursor.fetchall()
+    if rows:
+        teachers = [row[0] for row in rows]
+        department_name = rows[0][1]
+        return {
+            "teachers": teachers,
+            "code": 2,
+            "related": department_name
+        }
+
+    # 4. Поиск по преподавателю
+    query_teacher = """
+        SELECT DISTINCT FullName
+        FROM Teachers
+        WHERE TeacherFullNameLow LIKE ?
+    """
+    cursor.execute(query_teacher, (pattern,))
+    rows = cursor.fetchall()
+    if rows:
+        teachers = [row[0] for row in rows]
+        return {
+            "teachers": teachers,
+            "code": 3,
+            "related": None
+        }
+
+    # Ничего не найдено
+    return None
+
+
+def get_teachers_sub_id(name: str):
+    """
+    Выполняет поиск преподавателей по иерархии:
+    1. По институту
+    2. По факультету
+    3. По кафедре
+    4. По имени преподавателя
+    5. Ничего не найдено → None
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    pattern = f"{name.lower()}%"
+
+    # 1. Поиск по институту
+    query_institute = """
+        SELECT DISTINCT T.TeacherID, I.FullName
+        FROM Teachers T
+        JOIN Departament D ON T.DepartamentID = D.DepartamentID
+        JOIN Faculties F ON D.FacultyID = F.FacultyID
+        JOIN Institutes I ON F.InstituteID = I.InstituteID
+        WHERE I.FullNameLow LIKE ? OR I.ShortNameLow LIKE ?
+    """
+    cursor.execute(query_institute, (pattern, pattern))
+    rows = cursor.fetchall()
+    if rows:
+        teachers = [row[0] for row in rows]
+        institute_name = rows[0][1]
+        return {
+            "teachers": teachers,
+            "code": 0,
+            "related": institute_name
+        }
+
+    # 2. Поиск по факультету
+    query_faculty = """
+        SELECT DISTINCT T.TeacherID, F.FacultyName
+        FROM Teachers T
+        JOIN Departament D ON T.DepartamentID = D.DepartamentID
+        JOIN Faculties F ON D.FacultyID = F.FacultyID
+        WHERE F.FacultyNameLow LIKE ? OR F.ShortNameLow LIKE ?
+    """
+    cursor.execute(query_faculty, (pattern, pattern))
+    rows = cursor.fetchall()
+    if rows:
+        teachers = [row[0] for row in rows]
+        faculty_name = rows[0][1]
+        return {
+            "teachers": teachers,
+            "code": 1,
+            "related": faculty_name
+        }
+
+    # 3. Поиск по кафедре
+    query_department = """
+        SELECT DISTINCT T.TeacherID, D.DepartamentName
+        FROM Teachers T
+        JOIN Departament D ON T.DepartamentID = D.DepartamentID
+        WHERE D.DepartamentNameLow LIKE ? OR D.ShortNameLow LIKE ?
+    """
+    cursor.execute(query_department, (pattern, pattern))
+    rows = cursor.fetchall()
+    if rows:
+        teachers = [row[0] for row in rows]
+        department_name = rows[0][1]
+        return {
+            "teachers": teachers,
+            "code": 2,
+            "related": department_name
+        }
+
+    # 4. Поиск по преподавателю
+    query_teacher = """
+        SELECT DISTINCT TeacherID
+        FROM Teachers
+        WHERE TeacherFullNameLow LIKE ?
+    """
+    cursor.execute(query_teacher, (pattern,))
+    rows = cursor.fetchall()
+    if rows:
+        teachers = [row[0] for row in rows]
+        return {
+            "teachers": teachers,
+            "code": 3,
+            "related": None
+        }
+
+    # Ничего не найдено
+    return None
 
 
 def is_check_sub(search_str: str) -> bool:

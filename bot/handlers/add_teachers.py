@@ -118,14 +118,19 @@ async def refresh_add_teacher_message(event: Union[types.Message, types.Callback
         data = await state.get_data()
         page = data.get('found_page', 0)
         text = data.get('message', '🎓 Выберите преподавателя:')
+        sub_text = data.get('sub_message', '')
         teachers = data.get('actual_data')
 
         keyboard = get_inline_key_add_info(user_id, teachers, "teachers", page)
 
         if isinstance(event, types.Message):
-            await event.answer(text, reply_markup=keyboard)
+            await event.answer(f"{sub_text}\n"
+                               f"\n"
+                               f"{text}", reply_markup=keyboard)
         else:
-            await event.message.edit_text(text, reply_markup=keyboard)
+            await event.message.edit_text(f"{sub_text}\n"
+                                          f"\n"
+                                          f"{text}", reply_markup=keyboard)
     except Exception as e:
         logger.warning(f'Проблема с обновлениями меню с преподавателями: {e}')
     finally:

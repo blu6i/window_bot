@@ -6,8 +6,17 @@ from aiogram.types import CallbackQuery, Message, ChatType
 
 import sql
 from bot import get_inline_key_list, MenuStates
+from bot.handlers.add_teachers import refresh_add_teacher_message
 from bot.keyboards import get_inline_key_add_info
 from utils import logger
+
+NULL_LIST = ("👨‍🏫 Список преподавателей пуст\n"
+             "\n"
+             "ℹ️ Введите ФИО преподавателя (Формат: Фамилия И.О.) или название подразделения университета")
+
+NO_NULL_LIST = ("ℹ️ Нажмите на преподавателя, если нужно удалить\n"
+                "\n"
+                "👨‍🏫 Ваши группы:")
 
 
 # =======[Меню с добавлением преподавателей]=======
@@ -17,9 +26,7 @@ async def show_teachers(event: Union[CallbackQuery, Message], state: FSMContext)
         u_id = event.from_user.id
         u_teachers = sql.get_user_teachers(u_id)
 
-        text = "👨‍🏫 У вас пока нет добавленных преподавателей." if not u_teachers else ("👨‍🏫 Ваши "
-                                                                                        "преподаватели:\nНажмите на "
-                                                                                        "преподавателя для удаления")
+        text = NULL_LIST if not u_teachers else NO_NULL_LIST
         keyboard = get_inline_key_list(u_id, "teacher")
 
         if isinstance(event, CallbackQuery):
@@ -54,7 +61,7 @@ async def add_teacher(msg: types.Message, state: FSMContext):
             await refresh_teachers_message(msg, state, u_id, text)
             return"""
 
-        # 2. Поиск по подразделению (институт, факультет, кафедра)
+        """# 2. Поиск по подразделению (институт, факультет, кафедра)
         if sql.is_check_sub(teacher):
             teachers = sql.get_teachers_sub(teacher)
             if not teachers:
@@ -64,11 +71,47 @@ async def add_teacher(msg: types.Message, state: FSMContext):
             await state.update_data(actual_data=teacher)
             keyboard = get_inline_key_add_info(u_id, teacher, 'teachers')
             await msg.answer("🎓 Выберите преподавателя для добавления:", reply_markup=keyboard)
-            return
-
-        # 3. Ничего не найдено
-        text = f"⚠️ Преподавателя или подразделения «{teacher}» нет."
-        await refresh_teachers_message(msg, state, u_id, text)
+            return"""
+        teachers = sql.get_teachers_sub(teacher)
+        teachers_name = teachers['teachers']
+        teachers_name.sort()
+        if teacher:
+            await state.update_data(found_teachers=teachers_name)
+            await state.update_data(actual_data=teacher)
+            if teachers['code'] == 3:
+                if len(teachers_name) == 1:
+                    res = sql.add_user_teacher(u_id, teachers_name[0])
+                    if res['flag']:
+                        text = f"✅ Преподаватель «{sql.get_teacher_name(res['teacher_id'])}» добавлен!"
+                    else:
+                        text = f"⚠️ Преподаватель «{sql.get_teacher_name(res['teacher_id'])}» уже добавлен."
+                    await refresh_teachers_message(msg, state, u_id, text)
+                else:
+                    await refresh_add_teacher_message(msg, state, u_id)
+            elif teachers['code'] == 0:
+                await state.update_data(sub_message=f'ℹ️ Преподаватели института:\n'
+                                                    f'{teachers["related"]}')
+                await refresh_add_teacher_message(msg, state, u_id)
+            elif teachers['code'] == 1:
+                try:
+                    clean_related = teachers['related'].replace("(ОРУ)", "").strip()
+                except:
+                    clean_related = teachers['related']
+                await state.update_data(sub_message=f'ℹ️ Преподаватели факультета:\n'
+                                                    f'{clean_related}')
+                await refresh_add_teacher_message(msg, state, u_id)
+            elif teachers['code'] == 2:
+                try:
+                    clean_related = teachers['related'].replace("(ОРУ)", "").strip()
+                except:
+                    clean_related = teachers['related']
+                await state.update_data(sub_message=f'ℹ️ Преподаватели кафедры:\n'
+                                                    f'{clean_related}')
+                await refresh_add_teacher_message(msg, state, u_id)
+        else:
+            # 3. Ничего не найдено
+            text = f"⚠️ Преподавателя или подразделения «{teacher}» нет."
+            await refresh_teachers_message(msg, state, u_id, text)
     except Exception as e:
         logger.warning(f'Ошибка при добавлении преподавателя: {e}')
 

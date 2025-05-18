@@ -2,6 +2,7 @@ import hashlib
 import os
 import sqlite3
 from datetime import datetime
+from typing import Dict, Any
 
 import pandas as pd
 
@@ -189,7 +190,7 @@ def add_schedule_teacher(df: pd.DataFrame):
         logger.error(f"Ошибка при добавлении расписания преподавателей: {str(e)}")
 
 
-def add_user_teacher(user: int, teacher_name: str) -> bool:
+def add_user_teacher(user: int, teacher_name: str) -> bool | dict[str, bool | Any]:
     """
     Добавить преподавателя пользователю по ФИО.
     Если пользователя нет в базе — добавляется.
@@ -211,8 +212,12 @@ def add_user_teacher(user: int, teacher_name: str) -> bool:
         (user_id, teacher_id)
     )
     conn.commit()
-    return True
-
+    if cursor.rowcount == 0:
+        return {'flag': False,
+                'teacher_id': row[0]}
+    else:
+        return {'flag': True,
+                'teacher_id': row[0]}
 
 # Обновление поля UserID в Teachers
 def update_teacher_userid(u_id, teacher_id):

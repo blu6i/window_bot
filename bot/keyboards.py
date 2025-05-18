@@ -1,7 +1,7 @@
 import os
 from math import ceil
 
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardRemove
 from dotenv import load_dotenv
 
 from bot.handlers.formating import get_rus_date
@@ -140,9 +140,8 @@ def get_inline_key_add_info(u_id: int, data: str, type_: str, page: int = 0) -> 
         add_info = get_user_groups(u_id)
     elif type_ == 'teachers':
         # Получаем найденные группы (имена групп)
-        found_info = []
-        for teacher in sql.get_teachers_sub(data):
-            found_info.append(teacher['id'])
+        found_info = sql.get_teachers_sub_id(data)['teachers'] or []
+        found_info.sort()
         # Получаем ID групп, которые у пользователя уже есть
         add_info = sql.get_user_teachers(u_id)
 
