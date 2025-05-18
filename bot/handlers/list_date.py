@@ -64,6 +64,11 @@ async def add_date(msg: types.Message, state: FSMContext):
                              reply_markup=get_inline_key_list(u_id, "date")
                              )
             return
+        except Exception:
+            await msg.answer('⚠️ Некорректный формат даты',
+                             reply_markup=get_inline_key_list(u_id, "date")
+                             )
+            return
 
         # Проверка: есть ли вообще такая дата в БД расписания
         if not sql.is_date_in_schedule(date):
@@ -141,11 +146,7 @@ def date_format_db(text: str) -> str:
     """Преобразование строки вида DD, DD.MM, DD.MM.YYYY в YYYY-MM-DD с учетом перехода на следующий месяц"""
     try:
         today = datetime.now()
-        try:
-            parts = list(map(int, text.split(".")))
-        except ValueError as e:
-            logger.error(f'Ошибка при преобразовании в формат БД: {e}')
-            raise
+        parts = list(map(int, text.split(".")))
 
         if len(parts) == 1:
             # Если только день указан
@@ -180,6 +181,7 @@ def date_format_db(text: str) -> str:
         return date_obj.strftime("%Y-%m-%d")
     except Exception as e:
         logger.warning(f'Проблема при работе с форматированием даты: {e}')
+        raise
 
 
 def register_date_handlers(dp: Dispatcher):

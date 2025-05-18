@@ -44,7 +44,7 @@ async def add_teacher(msg: types.Message, state: FSMContext):
         u_teachers = sql.get_user_teachers(u_id)
 
         # 1. Точный поиск
-        if teacher.lower() in sql.get_all_teachers():
+        """if teacher.lower() in sql.get_all_teachers():
             if sql.get_teacher_id(teacher) in u_teachers:
                 text = f"⚠️ Преподаватель «{teacher}» уже добавлен."
             else:
@@ -52,10 +52,10 @@ async def add_teacher(msg: types.Message, state: FSMContext):
                 text = f"✅ Преподаватель «{teacher}» добавлен!"
 
             await refresh_teachers_message(msg, state, u_id, text)
-            return
+            return"""
 
         # 2. Поиск по подразделению (институт, факультет, кафедра)
-        elif sql.is_check_sub(teacher):
+        if sql.is_check_sub(teacher):
             teachers = sql.get_teachers_sub(teacher)
             if not teachers:
                 return

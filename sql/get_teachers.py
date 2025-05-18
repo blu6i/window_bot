@@ -89,6 +89,7 @@ def get_teachers_sub(name: str) -> list[dict]:
     """
     conn = get_connection()
     cursor = conn.cursor()
+    pattern = f"{name.lower()}%"
 
     query = """
     SELECT T.FullName, T.TeacherID
@@ -96,26 +97,17 @@ def get_teachers_sub(name: str) -> list[dict]:
     JOIN Departament D ON T.DepartamentID = D.DepartamentID
     JOIN Faculties F ON D.FacultyID = F.FacultyID
     JOIN Institutes I ON F.InstituteID = I.InstituteID
-    WHERE I.FullName = ? OR I.ShortName = ?
-       OR F.FacultyName = ? OR F.ShortName = ?
-       OR D.DepartamentName = ? OR D.ShortName = ?
-       OR I.FullNameLow = ? OR I.ShortNameLow = ?
-       OR F.FacultyNameLow = ? OR F.ShortNameLow = ?
-       OR D.DepartamentNameLow = ? OR D.ShortNameLow = ?
+    WHERE I.FullName LIKE ? OR I.ShortName LIKE ?
+       OR F.FacultyName LIKE ? OR F.ShortName LIKE ?
+       OR D.DepartamentName LIKE ? OR D.ShortName LIKE ?
+       OR I.FullNameLow LIKE ? OR I.ShortNameLow LIKE ?
+       OR F.FacultyNameLow LIKE ? OR F.ShortNameLow LIKE ?
+       OR D.DepartamentNameLow LIKE ? OR D.ShortNameLow LIKE ?
+       OR T.TeacherFullNameLow LIKE ?
     GROUP BY T.TeacherID
     """
-
-    name_low = name.lower()
-
-    cursor.execute(query, (
-        name, name,  # Точное совпадение: институт/факультет/кафедра
-        name, name,
-        name, name,
-
-        name_low, name_low,  # Регистронезависимое совпадение
-        name_low, name_low,
-        name_low, name_low
-    ))
+    params = [pattern] * 13
+    cursor.execute(query, params)
 
     rows = cursor.fetchall()
     return [{"name": row[0], "id": row[1]} for row in rows]
@@ -137,29 +129,31 @@ def is_check_sub(search_str: str) -> bool:
 
     # Приводим к нижнему регистру для регистронезависимого поиска
     pattern = f"{search_str.lower()}%"
-    # 1. Проверка по кафедрам
+    # 0. Проверка по преподавателям
     cursor.execute("""
-        SELECT 1 FROM Departament 
-        WHERE OR DepartamentNameLow = ? OR ShortNameLow = ?
-    """, (search_str, search_str, search_low, search_low))
+        SELECT 1 FROM Teachers WHERE TeacherFullNameLow LIKE ?
+    """, (pattern, ))
     if cursor.fetchone():
         return True
-
+    # 1. Проверка по кафедрам
+    cursor.execute("""
+        SELECT 1 FROM Departament WHERE DepartamentNameLow LIKE ? OR ShortNameLow LIKE ?
+    """, (pattern, pattern))
+    if cursor.fetchone():
+        return True
     # 2. Проверка по факультетам
     cursor.execute("""
         SELECT 1 FROM Faculties 
-        WHERE FacultyName = ? OR ShortName = ?
-           OR FacultyNameLow = ? OR ShortNameLow = ?
-    """, (search_str, search_str, search_low, search_low))
+        WHERE FacultyNameLow LIKE ? OR ShortNameLow LIKE ?
+    """, (pattern, pattern))
     if cursor.fetchone():
         return True
 
     # 3. Проверка по институтам
     cursor.execute("""
         SELECT 1 FROM Institutes 
-        WHERE FullName = ? OR ShortName = ?
-           OR FullNameLow = ? OR ShortNameLow = ?
-    """, (search_str, search_str, search_low, search_low))
+        WHERE FullNameLow LIKE ? OR ShortNameLow LIKE ?
+    """, (pattern, pattern))
     if cursor.fetchone():
         return True
 
