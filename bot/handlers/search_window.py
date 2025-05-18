@@ -5,6 +5,7 @@ from aiogram.types import ChatType, InlineKeyboardMarkup, InlineKeyboardButton
 
 import sql
 from bot.handlers.common import generate_free_windows_multi, send_result_text
+from bot.handlers.formating import get_rus_date
 from utils import logger
 
 # Предопределённые временные интервалы
@@ -50,7 +51,8 @@ async def search_window_user_handler(event: Union[types.CallbackQuery, types.Mes
         else:
             result_lines = ["🪟 <b>Свободные окна:</b>"]
             for date, times in free_windows.items():
-                result_lines.append(f"\n📅 <b>{date}</b>")
+                form_date, day = get_rus_date(date)
+                result_lines.append(f"\n📅 <b>{form_date} ({day})</b>")
                 for time in times:
                     result_lines.append(f"🕒 {time}")
             result_text = "\n".join(result_lines)

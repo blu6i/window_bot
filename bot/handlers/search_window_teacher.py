@@ -1,4 +1,3 @@
-import re
 from typing import Union
 
 from aiogram import types, Dispatcher
@@ -7,8 +6,9 @@ from aiogram.types import ChatType, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.utils.exceptions import MessageNotModified
 
 import sql
-from bot import MenuStates, get_main_menu
+from bot import MenuStates
 from bot.handlers.common import notify_mp, back_to_main, generate_free_windows_multi, out_main_menu
+from bot.handlers.formating import get_rus_date
 from bot.keyboards import get_free_windows_keyboard, generate_edit_menu_keyboard
 
 
@@ -27,10 +27,13 @@ async def show_current_page(message: types.Message, state: FSMContext, text: str
     current_date = dates[page]
     free_times = free_windows.get(current_date, [])
 
-    kb = get_free_windows_keyboard(current_date=current_date, free_times=free_times, selected=selected, page=page,
+    kb = get_free_windows_keyboard(current_date=current_date,
+                                   free_times=free_times,
+                                   selected=selected,
+                                   page=page,
                                    total_pages=len(dates))
-
-    msg_text = (f"📅 Выберите свободное время для {current_date}:\n"
+    form_date, day = get_rus_date(current_date)
+    msg_text = (f"📅 Выберите свободное время для {form_date} ({day}):\n"
                 f"\n"
                 f"{'Свободного времени нет' if not free_times else ''}\n"
                 f"\n"
@@ -343,12 +346,12 @@ def generate_summary(data: dict, initiator_teacher_name: str) -> str:
             teachers_str += f'• {sql.get_teacher_name(teacher)}\n'
     # Формируем время
     times_str = '\n'.join(f"• {time}" for time in times)
-
+    form_date, day = get_rus_date(current_date)
     # Собираем итоговое сообщение
     summary = (
         "📌 Предварительный просмотр:\n\n"
         f"⚡ Инициатор:\n{initiator_teacher_name}\n\n"
-        f"📅 Дата:\n{current_date}\n"
+        f"📅 Дата:\n{form_date} ({day})\n"
         f"⏰ Время:\n{times_str}\n\n"
         f"🗺️ Место проведение:\n{cabinet}\n\n"
         f"👥 Группы:\n{groups_str}\n"
@@ -371,7 +374,7 @@ async def save_final_data(call: types.CallbackQuery, state: FSMContext):
             group_ids = data.get('group_ids', [])
             teacher_ids = data.get('teacher_ids', [])
             cabinet = data.get('cabinet')
-            #cabinet_id = cabinet.get('id') if cabinet and 'id' in cabinet else None
+            # cabinet_id = cabinet.get('id') if cabinet and 'id' in cabinet else None
             comment = data.get('comment')
 
             groups = group_ids if group_ids else None
@@ -409,11 +412,11 @@ async def save_final_data(call: types.CallbackQuery, state: FSMContext):
         if teachers:
             for teacher in teachers:
                 teacher_name += f"\n• {sql.get_teacher_name(teacher)}"
-
+        form_date, day = get_rus_date(current_date)
         text = (
             f"🔔 Запланирована новая встреча:\n"
             f"⚡ Инициатор:\n{sql.get_teacher_name(initiator_teacher_id)}\n\n"
-            f"📅 Дата:\n{current_date}\n"
+            f"📅 Дата:\n{form_date} ({day})\n"
             f"⏰ Время:\n{', '.join(times)}\n\n"
             f"🗺️ Место проведение:\n{cabinet or 'Не указана'}\n\n"
             f"👥 Группы:{group_name}\n"

@@ -4,6 +4,7 @@ from math import ceil
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from dotenv import load_dotenv
 
+from bot.handlers.formating import get_rus_date
 from sql import get_user_groups, get_group_name, get_groups_id, get_user_dates, get_user_teachers
 import sql
 
@@ -99,8 +100,9 @@ def get_inline_key_list(user_id: int, data_type: str, page: int = 0) -> InlineKe
             ))
     else:
         for item in data_ids_on_page:
+            date_format, _ = get_rus_date(item)
             keyboard.insert(InlineKeyboardButton(
-                text=item,
+                text=date_format,
                 callback_data=f'-{item}'  # Передаем ID
             ))
 

@@ -8,6 +8,7 @@ from aiogram.types import CallbackQuery, InlineKeyboardMarkup, InlineKeyboardBut
 import sql
 from bot import MenuStates
 from bot.handlers.common import notify_mp, generate_free_windows_multi
+from bot.handlers.formating import get_rus_date
 from bot.keyboards import get_edit_meeting_menu, get_time_selection_keyboard, generate_meeting_keyboard
 from utils import logger
 
@@ -59,11 +60,14 @@ async def show_meeting_dates(message: types.Message, state: FSMContext, sub_text
         # Кнопки дат
         for i, date in enumerate(dates):
             icon = "🕒" if datetime.strptime(date, "%Y-%m-%d").date() >= datetime.now().date() else "✅"
-            kb.add(types.InlineKeyboardButton(f"{icon} {date}", callback_data=f"view_date_{date}"))
+            form_date, _ = get_rus_date(date)
+            kb.add(types.InlineKeyboardButton(f"{icon} {form_date}", callback_data=f"view_date_{date}"))
 
         kb.add(types.InlineKeyboardButton("🔙 Назад в меню", callback_data="back_to_menu"))
 
-        await message.edit_text(f"{sub_text}\n\n📅 Выберите дату:", reply_markup=kb)
+        await message.edit_text(f"{sub_text}\n"
+                                f"\n"
+                                f"📅 Выберите дату:", reply_markup=kb)
     except Exception as e:
         logger.warning(f'Ошибка при построении дат в меню "Мои встречи": {e}')
 
@@ -156,10 +160,10 @@ async def show_meet_details(msg: types.Message, state: FSMContext, sub_text: str
         initiator_name = "Вы" if initiator_id == teacher_id else sql.get_teacher_name(initiator_id)
         status_emoji = '🔴' if is_completed else '🟢'
         status_text = 'Завершено' if is_completed else 'Ожидается'
-
+        form_date, day = get_rus_date(date)
         formatted_text = f"""
 ⚡ <b>Инициатор:</b>\n{initiator_name}\n
-📅 <b>Дата:</b>\n{date}
+📅 <b>Дата:</b>\n{form_date} ({day})\n
 ⏰ <b>Время:</b>\n{time}\n
 🗺️ <b>Место проведение:</b>\n{cabinet_info}
 👥 <b>Группы:</b>\n{group_names}
@@ -339,13 +343,17 @@ async def send_reminder(call: types.CallbackQuery, state: FSMContext):
                 for teacher in teacher_id:
                     teacher_name += f"\n• {sql.get_teacher_name(teacher)}"
             # Текст оповещения
+            form_date, day = get_rus_date(date)
             text = (
                 f"🔔 Напоминание о встрече:\n"
-                f"📅 Дата:\n{date}\n"
-                f"⏰ Время:\n{time}\n\n"
-                f"🗺️ Место проведение:\n{cabinet or 'Не указана'}\n\n"
+                f"📅 Дата:\n{form_date} ({day})\n"
+                f"⏰ Время:\n{time}\n"
+                f"\n"
+                f"🗺️ Место проведение:\n{cabinet or 'Не указана'}\n"
+                f"\n"
                 f"👥 Группа:{group_name}\n"
-                f"👩🏻‍🏫 Преподаватель:{teacher_name}\n\n"
+                f"👩🏻‍🏫 Преподаватель:{teacher_name}\n"
+                f"\n"
                 f"💬 Комментарий:\n{comment or 'Не указан'}"
             )
             # Отправляем уведомление

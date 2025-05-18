@@ -2,6 +2,7 @@ from aiogram import Dispatcher, types
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 import sql
+from bot.handlers.formating import get_rus_date
 from utils import logger
 
 from datetime import datetime
@@ -40,7 +41,8 @@ async def group_meet(msg: types.Message):
 
         keyboard = InlineKeyboardMarkup(row_width=1)
         for date in actual_dates:
-            keyboard.add(InlineKeyboardButton(text=date,
+            form_date, _ = get_rus_date(date)
+            keyboard.add(InlineKeyboardButton(text=form_date,
                                               callback_data=f"group_meetings:{date}"))
 
         await msg.reply("📅 Выберите дату:", reply_markup=keyboard)
@@ -55,13 +57,12 @@ async def show_meetings_for_date(call: types.CallbackQuery):
         date = call.data.split(":")[1]
         chat_id = call.message.chat.id
         group_id = sql.get_group_tg_id(chat_id)
-
+        form_date, day = get_rus_date(date)
         meetings = sql.get_meet_date(group_id, date)
         if not meetings:
-            await call.message.edit_text(f"🔎 Нет встреч на {date}.")
+            await call.message.edit_text(f"🔎 Нет встреч на {form_date}.")
             return
-
-        text = f"📆 Встречи на {date}:\n"
+        text = f"📆 Встречи на {form_date} ({day}):\n"
         for meet in meetings:
             time, comment, cabinet = meet
             text += (f"🕒 Время: {time}\n"
