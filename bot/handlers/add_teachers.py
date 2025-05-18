@@ -6,6 +6,7 @@ from aiogram.types import ChatType
 
 import sql
 from bot import MenuStates
+from bot.handlers.remove_test import update_new_msg
 from bot.keyboards import get_inline_key_add_info, get_inline_key_list
 from utils import logger
 
@@ -53,14 +54,14 @@ async def callback_add_all_teachers(call: types.CallbackQuery, state: FSMContext
         data = await state.get_data()
         teachers = data.get('found_teachers', [])
         for teacher in teachers:
-            if teacher['id'] not in u_teachers:
-                sql.add_user_teacher(u_id, teacher['name'])
+            if teacher not in u_teachers:
+                sql.add_user_teacher(u_id, teacher)
 
         actual_data = data.get('actual_data')
         keyboard = get_inline_key_add_info(u_id, actual_data, 'teachers')
         await call.message.edit_reply_markup(reply_markup=keyboard)
     except Exception as e:
-        logger.warning(f'Проблема при добавлении всех групп из подразделения: {e}')
+        logger.warning(f'Проблема при добавлении всех преподавателей из подразделения: {e}')
     finally:
         await call.answer()
 
@@ -114,6 +115,7 @@ async def callback_change_add_page(call: types.CallbackQuery, state: FSMContext)
 async def refresh_add_teacher_message(event: Union[types.Message, types.CallbackQuery],
                                       state: FSMContext, user_id: int):
     """Обновляет сообщение с меню выбора преподавателей для добавления"""
+    sent = None
     try:
         data = await state.get_data()
         page = data.get('found_page', 0)
@@ -124,7 +126,7 @@ async def refresh_add_teacher_message(event: Union[types.Message, types.Callback
         keyboard = get_inline_key_add_info(user_id, teachers, "teachers", page)
 
         if isinstance(event, types.Message):
-            await event.answer(f"{sub_text}\n"
+            sent = await event.answer(f"{sub_text}\n"
                                f"\n"
                                f"{text}", reply_markup=keyboard)
         else:
@@ -134,6 +136,8 @@ async def refresh_add_teacher_message(event: Union[types.Message, types.Callback
     except Exception as e:
         logger.warning(f'Проблема с обновлениями меню с преподавателями: {e}')
     finally:
+        if isinstance(event, types.Message):
+            await update_new_msg(event.chat.id, sent, state)
         if isinstance(event, types.CallbackQuery):
             await event.answer()
 

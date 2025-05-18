@@ -44,18 +44,18 @@ async def search_window_user_handler(event: Union[types.CallbackQuery, types.Mes
 
         # Генерация свободных окон
         free_windows = generate_free_windows_multi(group_ids, teacher_ids, dates)
-
+        print(free_windows)
         # Формируем текст результата
-        if not free_windows:
-            result_text = "❌ Свободных окон не найдено."
-        else:
-            result_lines = ["🪟 <b>Свободные окна:</b>"]
-            for date, times in free_windows.items():
-                form_date, day = get_rus_date(date)
-                result_lines.append(f"\n📅 <b>{form_date} ({day})</b>")
+        result_lines = ["🪟 <b>Свободные окна:</b>"]
+        for date, times in free_windows.items():
+            form_date, day = get_rus_date(date)
+            result_lines.append(f"\n📅 <b>{form_date} ({day})</b>")
+            if not times:
+                result_lines.append("❌ Свободных окон не найдено.")
+            else:
                 for time in times:
                     result_lines.append(f"🕒 {time}")
-            result_text = "\n".join(result_lines)
+        result_text = "\n".join(result_lines)
 
         # Отправка сообщения
         await send_result_text(event, result_text, reply_markup=btn_back)

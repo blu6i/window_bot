@@ -200,7 +200,7 @@ def add_user_teacher(user: int, teacher_name: str) -> bool | dict[str, bool | An
     conn = get_connection()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT TeacherID FROM Teachers WHERE TeacherFullNameLow = ?", (teacher_name.lower(),))
+    cursor.execute("SELECT TeacherID FROM Teachers WHERE TeacherFullNameLow LIKE ?", (teacher_name.lower(),))
     row = cursor.fetchone()
     if not row:
         return False

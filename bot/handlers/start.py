@@ -3,8 +3,6 @@ from aiogram.dispatcher import FSMContext
 from aiogram.types import ReplyKeyboardRemove, ChatType
 
 from bot.handlers.common import out_main_menu
-from bot.handlers.testing_bot import send_test_auth_message
-
 
 WELCOME_TEXT = ("Добро пожаловать в бота для поиска свободных окон в расписании групп!\n"
                 "\n"
@@ -33,7 +31,6 @@ async def cmd_start(msg: types.Message, state: FSMContext):
     await msg.answer(WELCOME_TEXT,
                      reply_markup=ReplyKeyboardRemove(),
                      parse_mode='HTML')
-    #await send_test_auth_message(msg)
     await out_main_menu(msg, state)
 
 
