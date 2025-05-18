@@ -3,10 +3,11 @@ from aiogram.dispatcher import FSMContext
 
 import sql
 from bot import get_main_menu
+from bot.handlers.remove_test import update_new_msg
 from utils import logger
 
 
-async def authorization_teacher(msg: types.Message):
+async def authorization_teacher(msg: types.Message, state: FSMContext):
     try:
         parts = msg.text.split(maxsplit=1)
         if len(parts) < 2:
@@ -29,7 +30,10 @@ async def authorization_teacher(msg: types.Message):
             return  # Хэш не найден
         # Обновляем поле UserID
         sql.update_teacher_userid(user_id, teacher_id)
-        await msg.answer("Вы успешно авторизованы! Обновите меню командой /start")
+        await msg.answer("Вы успешно авторизованы!")
+        sent = await msg.answer("🏠 Главное меню\n\nВыберите нужный раздел",
+                                reply_markup=get_main_menu(u_id))
+        await update_new_msg(msg.chat.id, sent, state)
     except Exception as e:
         logger.warning(f'Ошибка авторизации преподавателя: {e}')
 
@@ -43,7 +47,7 @@ async def unauthorization_teacher(msg: types.Message, state: FSMContext):
             sql.unupdate_teacher_userid(teacher_id)
             sent = await msg.answer("🏠 Главное меню\n\nВыберите нужный раздел",
                                     reply_markup=get_main_menu(u_id))
-            await state.update_data(last_msg=sent.message_id)
+            await update_new_msg(msg.chat.id, sent, state)
     except Exception as e:
         logger.warning(f'Ошибка анавторизации преподавателя: {e}')
 

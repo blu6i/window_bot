@@ -1,4 +1,4 @@
-from typing import Union, List
+from typing import Union
 
 from aiogram import types, Dispatcher
 from aiogram.dispatcher import FSMContext
@@ -6,9 +6,10 @@ from aiogram.types import ChatType, CallbackQuery, Message
 
 import sql
 from bot import get_main_menu
-from utils import logger
-from parser import groups_web_parse, parse_schedule_teacher
+from bot.handlers.remove_test import update_new_msg
 from bot.init_bot import get_bot
+from parser import groups_web_parse, parse_schedule_teacher
+from utils import logger
 
 LINK = 'https://www.vyatsu.ru/studentu-1/spravochnaya-informatsiya/raspisanie-zanyatiy-dlya-studentov.html'
 LINK_TEACHER = 'https://www.vyatsu.ru/studentu-1/spravochnaya-informatsiya/teacher.html'
@@ -45,63 +46,72 @@ async def back_to_main(call: types.CallbackQuery, state: FSMContext, text: str =
     """Вернуться в главное меню"""
     try:
         await state.finish()
-        sent = await out_main_menu(call, text)
-        await state.update_data(last_msg=sent.message_id)
+        await out_main_menu(call, state, text)
     except Exception as e:
         logger.warning(f'Проблема при возврате в главное меню: {e}')
     finally:
         await call.answer()
 
 
-async def out_main_menu(event: Union[types.Message, types.CallbackQuery], sub_text: str = '', is_new_msg: bool = False):
-    u_id = event.from_user.id
-    if sql.is_teacher_authorized(u_id):
-        teacher_name = f'{sql.get_teacher_name(sql.get_teacher_id_tg(u_id))}\n'
-        text = ('🏠 *Главное меню*\n'
-                '\n'
-                'Вы авторизовались как:\n'
-                f'{teacher_name}'
-                f'Введите `!анкод` для выхода\n'
-                f'\n'
-                f'Выберите нужный раздел\n'
-                f'{sub_text}')
-    else:
-        text = ('🏠 *Главное меню*\n'
-                '\n'
-                'Выберите нужный раздел\n'
-                f'{sub_text}')
-
-    if isinstance(event, types.CallbackQuery):
-        if is_new_msg:
-            sent = await event.message.answer(f'{text}',
-                                              reply_markup=get_main_menu(u_id),
-                                              parse_mode='Markdown')
+async def out_main_menu(event: Union[types.Message, types.CallbackQuery],
+                        state: FSMContext,
+                        sub_text: str = '',
+                        is_new_msg: bool = False):
+    sent = None
+    chat_id = None
+    try:
+        u_id = event.from_user.id
+        if sql.is_teacher_authorized(u_id):
+            teacher_name = f'{sql.get_teacher_name(sql.get_teacher_id_tg(u_id))}\n'
+            text = ('🏠 *Главное меню*\n'
+                    '\n'
+                    'Вы авторизовались как:\n'
+                    f'{teacher_name}'
+                    f'Введите `!анкод` для выхода\n'
+                    f'\n'
+                    f'Выберите нужный раздел\n'
+                    f'{sub_text}')
         else:
-            try:
-                sent = await event.message.edit_text(f'{text}',
-                                                     reply_markup=get_main_menu(u_id),
-                                                     parse_mode='Markdown')
-            except:
+            text = ('🏠 *Главное меню*\n'
+                    '\n'
+                    'Выберите нужный раздел\n'
+                    f'{sub_text}')
+
+        if isinstance(event, types.CallbackQuery):
+            chat_id = event.message.chat.id
+            if is_new_msg:
                 sent = await event.message.answer(f'{text}',
                                                   reply_markup=get_main_menu(u_id),
                                                   parse_mode='Markdown')
-            finally:
-                await event.answer()
-    else:
-        if is_new_msg:
-            sent = await event.answer(f'{text}',
-                                      reply_markup=get_main_menu(u_id),
-                                      parse_mode='Markdown')
+            else:
+                try:
+                    sent = await event.message.edit_text(f'{text}',
+                                                         reply_markup=get_main_menu(u_id),
+                                                         parse_mode='Markdown')
+                except:
+                    sent = await event.message.answer(f'{text}',
+                                                      reply_markup=get_main_menu(u_id),
+                                                      parse_mode='Markdown')
+                finally:
+                    await event.answer()
         else:
-            try:
-                sent = await event.edit_text(f'{text}',
-                                             reply_markup=get_main_menu(u_id),
-                                             parse_mode='Markdown')
-            except:
+            chat_id = event.chat.id
+            if is_new_msg:
                 sent = await event.answer(f'{text}',
                                           reply_markup=get_main_menu(u_id),
                                           parse_mode='Markdown')
-    return sent
+            else:
+                try:
+                    sent = await event.edit_text(f'{text}',
+                                                 reply_markup=get_main_menu(u_id),
+                                                 parse_mode='Markdown')
+                except:
+                    sent = await event.answer(f'{text}',
+                                              reply_markup=get_main_menu(u_id),
+                                              parse_mode='Markdown')
+        return sent
+    finally:
+        await update_new_msg(chat_id, sent, state)
 
 
 async def notify_mp(group_ids: list, teacher_ids: list, message: str):

@@ -1,4 +1,5 @@
 from aiogram import types, Dispatcher
+from aiogram.dispatcher import FSMContext
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ChatType
 from random import choice
 
@@ -28,7 +29,7 @@ async def send_test_auth_message(msg: types.Message):
     await msg.answer(text, reply_markup=kb, parse_mode="Markdown")
 
 
-async def handle_random_login(call: types.CallbackQuery):
+async def handle_random_login(call: types.CallbackQuery, state: FSMContext):
     u_id = call.from_user.id
     if sql.is_teacher_authorized(u_id):
         text = '❌ Вы уже авторизованы'
@@ -51,10 +52,10 @@ async def handle_random_login(call: types.CallbackQuery):
 
         await call.answer()
         text = f"✅ Вы вошли как преподаватель: *{full_name}*"
-    await out_main_menu(call, text, is_new_msg=True)
+    await out_main_menu(call, state, text, is_new_msg=True)
 
 
-async def handle_logout(call: types.CallbackQuery):
+async def handle_logout(call: types.CallbackQuery, state: FSMContext):
     user_id = call.from_user.id
     if not sql.is_teacher_authorized(user_id):
         text = '❌ Вы еще не авторизовались'
@@ -67,7 +68,7 @@ async def handle_logout(call: types.CallbackQuery):
 
         await call.answer()
         text = "🚪 Вы вышли из системы преподавателя."
-    await out_main_menu(call, text, is_new_msg=True)
+    await out_main_menu(call, state, text, is_new_msg=True)
 
 
 async def user_joined(event: types.ChatMemberUpdated):

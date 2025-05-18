@@ -448,8 +448,7 @@ async def save_final_data(call: types.CallbackQuery, state: FSMContext):
                     text += f"\n• {sql.get_teacher_name(teacher)}"
 
         await state.finish()
-        sent = await out_main_menu(call, text)
-        await state.update_data(last_msg=sent.message_id)
+        await out_main_menu(call, state, text)
     finally:
         await call.answer()
 

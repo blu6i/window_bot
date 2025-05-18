@@ -7,7 +7,7 @@ from aiogram.types import CallbackQuery, Message, ChatType
 import sql
 from bot import get_inline_key_list, MenuStates
 from bot.handlers.add_teachers import refresh_add_teacher_message
-from bot.keyboards import get_inline_key_add_info
+from bot.handlers.remove_test import update_new_msg
 from utils import logger
 
 NULL_LIST = ("👨‍🏫 Список преподавателей пуст\n"
@@ -22,6 +22,7 @@ NO_NULL_LIST = ("ℹ️ Нажмите на преподавателя, если
 # =======[Меню с добавлением преподавателей]=======
 async def show_teachers(event: Union[CallbackQuery, Message], state: FSMContext):
     """Вывод преподавателей пользователя"""
+    sent = None
     try:
         u_id = event.from_user.id
         u_teachers = sql.get_user_teachers(u_id)
@@ -34,13 +35,15 @@ async def show_teachers(event: Union[CallbackQuery, Message], state: FSMContext)
             await event.answer()
         else:
             sent = await event.answer(text, reply_markup=keyboard)
-        await state.update_data(last_msg=sent.message_id)
         await state.set_state(MenuStates.TEACHER_EDIT.state)
     except Exception as e:
         logger.warning(f'Ошибка при выводе меню с преподавателями: {e}')
     finally:
         if isinstance(event, CallbackQuery):
+            await update_new_msg(event.message.chat.id, sent, state)
             await event.answer()
+        else:
+            await update_new_msg(event.chat.id, sent, state)
 
 
 async def add_teacher(msg: types.Message, state: FSMContext):
@@ -48,30 +51,6 @@ async def add_teacher(msg: types.Message, state: FSMContext):
     try:
         teacher = msg.text.strip()
         u_id = msg.from_user.id
-        u_teachers = sql.get_user_teachers(u_id)
-
-        # 1. Точный поиск
-        """if teacher.lower() in sql.get_all_teachers():
-            if sql.get_teacher_id(teacher) in u_teachers:
-                text = f"⚠️ Преподаватель «{teacher}» уже добавлен."
-            else:
-                sql.add_user_teacher(u_id, teacher)
-                text = f"✅ Преподаватель «{teacher}» добавлен!"
-
-            await refresh_teachers_message(msg, state, u_id, text)
-            return"""
-
-        """# 2. Поиск по подразделению (институт, факультет, кафедра)
-        if sql.is_check_sub(teacher):
-            teachers = sql.get_teachers_sub(teacher)
-            if not teachers:
-                return
-
-            await state.update_data(found_teachers=teachers)
-            await state.update_data(actual_data=teacher)
-            keyboard = get_inline_key_add_info(u_id, teacher, 'teachers')
-            await msg.answer("🎓 Выберите преподавателя для добавления:", reply_markup=keyboard)
-            return"""
         teachers = sql.get_teachers_sub(teacher)
         teachers_name = teachers['teachers']
         teachers_name.sort()
@@ -162,6 +141,7 @@ async def refresh_teachers_message(msg: types.Message, state: FSMContext, user_i
         user_id: ID пользователя
         text: текст для саб строки
     """
+    sent = None
     try:
         u_teachers = sql.get_user_teachers(user_id)
 
@@ -180,6 +160,8 @@ async def refresh_teachers_message(msg: types.Message, state: FSMContext, user_i
         await state.update_data(last_msg=sent.message_id)
     except Exception as e:
         logger.warning(f'Ошибка при обновлении сообщения с добавлением преподавателей: {e}')
+    finally:
+        await update_new_msg(msg.chat.id, sent, state)
 
 
 def register_teachers_handlers(dp: Dispatcher):

@@ -4,6 +4,7 @@ from aiogram import types, Dispatcher
 from aiogram.dispatcher import FSMContext
 from aiogram.types import ChatType
 
+from bot.handlers.remove_test import update_new_msg
 from bot.keyboards import get_inline_key_list, get_inline_key_add_info
 from bot.states import MenuStates
 from utils import logger
@@ -139,9 +140,10 @@ async def refresh_add_group_message(event: Union[types.Message, types.CallbackQu
         data = data.get('actual_data')
         keyboard = get_inline_key_add_info(user_id, data, "groups", page)
         if isinstance(event, types.Message):
-            await event.answer(f"{sub_text}\n"
-                               f"\n"
-                               f"{text}", reply_markup=keyboard)
+            sent = await event.answer(f"{sub_text}\n"
+                                      f"\n"
+                                      f"{text}", reply_markup=keyboard)
+            await update_new_msg(event.chat.id, sent, state)
         else:
             await event.message.edit_text(f"{sub_text}\n"
                                           f"\n"

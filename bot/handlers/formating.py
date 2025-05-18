@@ -23,7 +23,7 @@ def get_rus_date(date_str: str) -> list[str]:
 
         formatted_date = date_obj.strftime("%d.%m.%Y")
 
-        return [formatted_date, weekday]  #f"{formatted_date} ({weekday})"
+        return [formatted_date, weekday]
 
     except ValueError as e:
         raise ValueError(f"Некорректный формат даты: {e}")

@@ -1,4 +1,3 @@
-import re
 from typing import Union
 
 from aiogram import types, Dispatcher
@@ -7,7 +6,8 @@ from aiogram.types import CallbackQuery, Message, ChatType
 
 import sql
 from bot.handlers.add_groups import refresh_add_group_message
-from bot.keyboards import get_inline_key_list, get_inline_key_add_info
+from bot.handlers.remove_test import update_new_msg
+from bot.keyboards import get_inline_key_list
 from bot.states import MenuStates
 
 NULL_LIST = ("👥 Список групп пуст\n"
@@ -21,48 +21,33 @@ NO_NULL_LIST = ("ℹ️ Нажмите на группу, если нужно у
 
 async def show_groups(event: Union[CallbackQuery, Message], state: FSMContext):
     """Вывод групп пользователя"""
-    u_id = event.from_user.id
-    u_groups = sql.get_user_groups(u_id)
+    sent = None
+    try:
+        u_id = event.from_user.id
+        u_groups = sql.get_user_groups(u_id)
 
-    text = NULL_LIST if not u_groups else NO_NULL_LIST
-    keyboard = get_inline_key_list(u_id, "group")
+        text = NULL_LIST if not u_groups else NO_NULL_LIST
+        keyboard = get_inline_key_list(u_id, "group")
 
-    # Обработка отправки в зависимости от типа события
-    if isinstance(event, CallbackQuery):
-        sent = await event.message.edit_text(text, reply_markup=keyboard)
-        await event.answer()
-    else:
-        sent = await event.answer(text, reply_markup=keyboard)
+        # Обработка отправки в зависимости от типа события
+        if isinstance(event, CallbackQuery):
+            sent = await event.message.edit_text(text, reply_markup=keyboard)
+        else:
+            sent = await event.answer(text, reply_markup=keyboard)
 
-    await state.update_data(last_msg=sent.message_id)
-    await state.set_state(MenuStates.GROUP_EDIT.state)
+        await state.set_state(MenuStates.GROUP_EDIT.state)
+    finally:
+        if isinstance(event, CallbackQuery):
+            await update_new_msg(event.message.chat.id, sent, state)
+            await event.answer()
+        else:
+            await update_new_msg(event.chat.id, sent, state)
 
 
 async def add_group(msg: types.Message, state: FSMContext):
     """Обработка команды добавления группы через название"""
     group = msg.text.strip()
     u_id = msg.from_user.id
-    u_groups = sql.get_user_groups(u_id)
-    # Получение ИД последнего сообщения с кнопками
-    data = await state.get_data()
-    """# 1. Проверка: пользователь ввел ПОЛНУЮ группу
-    if group.lower() in sql.get_all_groups():
-        if group in u_groups:
-            await msg.answer(f"⚠️ Группа «{group}» уже добавлена.")
-        else:
-            sql.add_user_group(u_id, group)
-            await msg.answer(f"✅ Группа «{group}» добавлена!")
-        await refresh_groups_message(msg, state, u_id)
-
-    # 2. Проверка: это факультет/институт/специальность?
-    if sql.is_check_entity(group):
-        # Нашли сущность — выводим все группы по факультету/институту
-        groups = sql.get_groups(group)
-        await state.update_data(found_groups=groups)
-        await state.update_data(actual_data=group)
-        # Генерация клавиатуры добавления групп
-        keyboard = get_inline_key_add_info(u_id, group, 'groups')
-        await msg.answer("📚 Выберите группы для добавления:", reply_markup=keyboard)"""
     groups = sql.get_groups(group)
     groups_name = groups['groups']
     groups_name.sort()
@@ -110,14 +95,16 @@ async def add_group(msg: types.Message, state: FSMContext):
 
 async def refresh_groups_message(msg, state, user_id, text: str = ""):
     """Обновить сообщение со списком групп"""
-    u_groups = sql.get_user_groups(user_id)
-    sub_text = NULL_LIST if not u_groups else NO_NULL_LIST
-    sent = await msg.answer(f"{text}"
-                            f"\n"
-                            f"{sub_text}\n",
-                            reply_markup=get_inline_key_list(user_id, "group"))
-
-    await state.update_data(last_msg=sent.message_id)
+    sent = None
+    try:
+        u_groups = sql.get_user_groups(user_id)
+        sub_text = NULL_LIST if not u_groups else NO_NULL_LIST
+        sent = await msg.answer(f"{text}"
+                                f"\n"
+                                f"{sub_text}\n",
+                                reply_markup=get_inline_key_list(user_id, "group"))
+    finally:
+        await update_new_msg(msg.chat.id, sent, state)
 
 
 async def list_user_groups(call: types.CallbackQuery, state: FSMContext):

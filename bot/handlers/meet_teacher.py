@@ -9,6 +9,7 @@ import sql
 from bot import MenuStates
 from bot.handlers.common import notify_mp, generate_free_windows_multi
 from bot.handlers.formating import get_rus_date
+from bot.handlers.remove_test import update_new_msg
 from bot.keyboards import get_edit_meeting_menu, get_time_selection_keyboard, generate_meeting_keyboard
 from utils import logger
 
@@ -325,7 +326,7 @@ async def send_reminder(call: types.CallbackQuery, state: FSMContext):
             index = data.get("current_meeting_index")
             meetings = data.get("meetings", {})
             if not date or date not in meetings or index >= len(meetings[date]):
-                await call.answer("❌ Невозможно найти данные встречи.")
+                # logger.error('Невозможно найти данные встречи.')
                 return
 
             meeting = meetings[date][index]
@@ -365,7 +366,7 @@ async def send_reminder(call: types.CallbackQuery, state: FSMContext):
 
         # Обратная связь пользователю
         if not unnotified_groups and not unnotified_teachers:
-            await call.message.answer("📬 Уведомление успешно отправлено.")
+            not_notified_message = "📬 Уведомление успешно отправлено."
         else:
             # Формируем сообщение о тех, кто не был уведомлен
             not_notified_message = "❗️ Не удалось отправить уведомления следующим участникам:\n"
@@ -385,7 +386,7 @@ async def send_reminder(call: types.CallbackQuery, state: FSMContext):
 
 
 # =======[Редактор встречи]=======
-async def start_edit_meeting(call: types.CallbackQuery, state: FSMContext):
+async def start_edit_meeting(call: types.CallbackQuery, state: FSMContext, sub_text: str):
     """Меню редактора"""
     try:
         async with state.proxy() as data:
@@ -402,7 +403,9 @@ async def start_edit_meeting(call: types.CallbackQuery, state: FSMContext):
                 data['old_dates_times'] = [(date, meeting['time'])]
 
         # Ожидаем, что теперь можно выбрать, что редактировать
-        await call.message.edit_text("🔁 Выберите, что редактировать:", reply_markup=get_edit_meeting_menu())
+        await call.message.edit_text("🔁 Выберите, что редактировать:\n"
+                                     "\n"
+                                     f"{sub_text}", reply_markup=get_edit_meeting_menu())
         await MenuStates.EDIT_MEET.set()
     except Exception as e:
         logger.warning(f'Ошибка при выводе меню редактирования: {e}')
@@ -420,8 +423,8 @@ async def cancel_edit_meeting(call: types.CallbackQuery, state: FSMContext):
                 data['meetings'][date][idx] = data['original_meeting']
                 del data['original_meeting']
         await MenuStates.MY_MEET.set()
-        await call.message.answer("❌ Изменения отменены.")
-        await show_meet_details(call.message, state)
+        text = "❌ Изменения отменены."
+        await show_meet_details(call.message, state, text)
     except Exception as e:
         logger.warning(f'Ошибка при отмене изменения редактирования: {e}')
     finally:
@@ -520,7 +523,7 @@ async def confirm_time_selection(call: CallbackQuery, state: FSMContext):
         selected_times = data["selected_times"]
         await MenuStates.EDIT_MEET.set()
         await state.update_data(final_times=selected_times)
-        await call.message.answer("✅ Время успешно выбрано.")
+        text = "✅ Время успешно выбрано."
         await start_edit_meeting(call, state)
     except Exception as e:
         logger.warning(f'Ошибка при принятии изменений во время редактирования времени: {e}')
@@ -531,12 +534,13 @@ async def confirm_time_selection(call: CallbackQuery, state: FSMContext):
 # =======[Ввод новой аудитории]=======
 async def change_room(call: types.CallbackQuery, state: FSMContext):
     """Изменение аудитории"""
+    sent = None
     try:
         data = await state.get_data()
         current_room = data.get("room", "не указана")
 
         await MenuStates.EDIT_MEET_ROOM.set()
-        await call.message.edit_text(
+        sent = await call.message.edit_text(
             f"Текущее место проведение: {current_room}\n"
             f"\n"
             f"Введите новое место проведение:",
@@ -547,11 +551,13 @@ async def change_room(call: types.CallbackQuery, state: FSMContext):
     except Exception as e:
         logger.warning(f'Ошибка при переходе в смену аудитории во время редактирования: {e}')
     finally:
+        await update_new_msg(call.message.chat.id, sent, state)
         await call.answer()
 
 
 async def process_room_input(msg: types.Message, state: FSMContext):
     """Проверка ввода"""
+    sent = None
     try:
         room = msg.text.strip()
         """if not re.match(r"^\d{1,2}-\d{3}[а-яa-z_]?$", room, re.IGNORECASE):
@@ -560,7 +566,7 @@ async def process_room_input(msg: types.Message, state: FSMContext):
 
         await state.update_data(room=room)
 
-        await msg.answer(
+        sent = await msg.answer(
             f"✅ Место проведение изменено на: {room}\n"
             f"\n"
             f"Введите другое или нажмите 'Назад' для возврата:",
@@ -570,6 +576,8 @@ async def process_room_input(msg: types.Message, state: FSMContext):
         )
     except Exception as e:
         logger.warning(f"Ошибка при проверке нового комментария во время редактирования: {e}")
+    finally:
+        await update_new_msg(msg.chat.id, sent, state)
 
 
 async def back_to_editor(call: types.CallbackQuery, state: FSMContext):
@@ -585,13 +593,16 @@ async def back_to_editor(call: types.CallbackQuery, state: FSMContext):
 # =======[Комментарий]=======
 async def enter_edit_comment(call: types.CallbackQuery, state: FSMContext):
     """Редактор комментария"""
+    sent = None
     try:
         data = await state.get_data()
         current_comment = data.get("comment", "-")
 
         await MenuStates.EDIT_MEET_COMMENT.set()
-        await call.message.edit_text(
-            f"💬 Текущий комментарий: {current_comment}\n\nВведите новый комментарий (до 256 символов):",
+        sent = await call.message.edit_text(
+            f"💬 Текущий комментарий: {current_comment}\n"
+            f"\n"
+            f"Введите новый комментарий (до 256 символов):",
             reply_markup=InlineKeyboardMarkup().add(
                 InlineKeyboardButton("🔙 Назад", callback_data="back_to_editor")
             )
@@ -599,22 +610,35 @@ async def enter_edit_comment(call: types.CallbackQuery, state: FSMContext):
     except Exception as e:
         logger.warning(f'Ошибка при переходе в редактор комментария: {e}')
     finally:
+        await update_new_msg(call.message.chat.id, sent, state)
         await call.answer()
 
 
 async def process_comment_input(msg: types.Message, state: FSMContext):
     """Проверка вводимого комментария"""
+    sent = None
+    data = await state.get_data()
+    current_comment = data.get("comment", "-")
     try:
         comment = msg.text.strip()
 
         if len(comment) > 256:
-            await msg.answer("❌ Комментарий слишком длинный. Максимум 256 символов.")
+            sent = await msg.answer("❌ Комментарий слишком длинный. Максимум 256 символов.\n"
+                                    "\n"
+                                    f"💬 Текущий комментарий: {current_comment}\n"
+                                    f"\n"
+                                    f"Введите новый комментарий (до 256 символов):",
+                                    reply_markup=InlineKeyboardMarkup().add(
+                                        InlineKeyboardButton("🔙 Назад", callback_data="back_to_editor")))
             return
 
         await state.update_data(comment=comment)
 
-        await msg.answer(
-            f"✅ Комментарий обновлён:\n<i>{comment}</i>\n\nВведите другой или нажмите 'Назад' для возврата:",
+        sent = await msg.answer(
+            f"✅ Комментарий обновлён:\n"
+            f"<i>{comment}</i>\n"
+            f"\n"
+            f"Введите другой или нажмите 'Назад' для возврата:",
             reply_markup=InlineKeyboardMarkup().add(
                 InlineKeyboardButton("🔙 Назад", callback_data="back_to_editor")
             ),
@@ -622,6 +646,8 @@ async def process_comment_input(msg: types.Message, state: FSMContext):
         )
     except Exception as e:
         logger.warning(f'Ошибка при проверке комментария во время редактирования: {e}')
+    finally:
+        await update_new_msg(msg.chat.id, sent, state)
 
 
 # =======[Принятия всех настроек]=======

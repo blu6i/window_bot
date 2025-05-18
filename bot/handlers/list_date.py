@@ -6,6 +6,7 @@ from aiogram.types import ChatType
 
 import sql
 from bot.handlers.formating import get_rus_date, date_format_db
+from bot.handlers.remove_test import update_new_msg
 from bot.keyboards import get_inline_key_list
 from bot.states import MenuStates
 from utils import logger
@@ -49,6 +50,7 @@ async def show_dates(event: Union[types.CallbackQuery, types.Message], state: FS
 
 async def add_date(msg: types.Message, state: FSMContext):
     """Добавление даты с проверкой наличия даты в расписании"""
+    sent = None
     try:
         u_id = msg.from_user.id
         text = msg.text.strip()
@@ -59,49 +61,51 @@ async def add_date(msg: types.Message, state: FSMContext):
             date = date_format_db(text)
             data_format, day = get_rus_date(date)
         except ValueError:
-            await msg.answer("⚠️ Некорректный формат даты или такой даты не существует в календаре. "
-                             "\n"
-                             "\nФормат ввода даты: DD, DD.\u200BMM или DD.MM.YYYY",
-                             reply_markup=get_inline_key_list(u_id, "date")
-                             )
+            sent = await msg.answer("⚠️ Некорректный формат даты или такой даты не существует в календаре. "
+                                    "\n"
+                                    "\nФормат ввода даты: DD, DD.\u200BMM или DD.MM.YYYY",
+                                    reply_markup=get_inline_key_list(u_id, "date")
+                                    )
             return
         except Exception:
-            await msg.answer("⚠️ Некорректный формат даты"
-                             "\n"
-                             "\nФормат ввода даты: DD, DD.\u200BMM или DD.MM.YYYY",
-                             reply_markup=get_inline_key_list(u_id, "date")
-                             )
+            sent = await msg.answer("⚠️ Некорректный формат даты"
+                                    "\n"
+                                    "\nФормат ввода даты: DD, DD.\u200BMM или DD.MM.YYYY",
+                                    reply_markup=get_inline_key_list(u_id, "date")
+                                    )
             return
 
         # Проверка: есть ли вообще такая дата в БД расписания
         if not sql.is_date_in_schedule(date):
-            await msg.answer(f"⚠️ На {data_format} нет расписания."
-                             "\n"
-                             "\nФормат ввода даты: DD, DD.\u200BMM или DD.MM.YYYY",
-                             reply_markup=get_inline_key_list(u_id, "date")
-                             )
+            sent = await msg.answer(f"⚠️ На {data_format} нет расписания."
+                                    "\n"
+                                    "\nФормат ввода даты: DD, DD.\u200BMM или DD.MM.YYYY",
+                                    reply_markup=get_inline_key_list(u_id, "date")
+                                    )
             return
 
         u_id = msg.from_user.id
         u_dates = sql.get_user_dates(u_id)
 
         if date in u_dates:
-            await msg.answer(f"⚠️ Дата {data_format} уже добавлена."
-                             "\n"
-                             "\nФормат ввода даты: DD, DD.\u200BMM или DD.MM.YYYY",
-                             reply_markup=get_inline_key_list(u_id, "date")
-                             )
+            sent = await msg.answer(f"⚠️ Дата {data_format} уже добавлена."
+                                    "\n"
+                                    "\nФормат ввода даты: DD, DD.\u200BMM или DD.MM.YYYY",
+                                    reply_markup=get_inline_key_list(u_id, "date")
+                                    )
             return
 
         sql.add_user_date(u_id, date)
-        await msg.answer(f"✅ Дата {data_format} добавлена."
-                             "\n"
-                             "\nФормат ввода даты: DD, DD.\u200BMM или DD.MM.YYYY",
-                         reply_markup=get_inline_key_list(u_id, "date")
-                         )
+        sent = await msg.answer(f"✅ Дата {data_format} добавлена."
+                                "\n"
+                                "\nФормат ввода даты: DD, DD.\u200BMM или DD.MM.YYYY",
+                                reply_markup=get_inline_key_list(u_id, "date")
+                                )
         await state.update_data(last_msg=last_msg_id)
     except Exception as e:
         logger.warning(f'Ошибка при добавлении даты: {e}')
+    finally:
+        await update_new_msg(msg.chat.id, sent, state)
 
 
 async def del_date(call: types.CallbackQuery):
@@ -135,6 +139,7 @@ async def del_date(call: types.CallbackQuery):
 
 async def refresh_dates_message(msg, state, user_id):
     """Обновить сообщение со списком дат"""
+    sent = None
     try:
         u_dates = sql.get_user_dates(user_id)
         if not u_dates:
@@ -146,9 +151,10 @@ async def refresh_dates_message(msg, state, user_id):
                                     "\nФормат ввода даты должен быть: DD, DD.\u200BMM или DD.MM.YYYY",
                                     reply_markup=get_inline_key_list(user_id, "date"))
 
-        await state.update_data(last_dates_msg=sent.message_id)
     except Exception as e:
         logger.warning(f'Проблема при обновлении сообщения со списком дат: {e}')
+    finally:
+        await update_new_msg(msg.chat.id, sent, state)
 
 
 def register_date_handlers(dp: Dispatcher):

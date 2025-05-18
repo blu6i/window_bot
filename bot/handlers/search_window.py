@@ -23,8 +23,8 @@ PAIR_TIMES = [
 # =======[Вывод свободных окон для дефолт пользователя]=======
 async def search_window_user_handler(event: Union[types.CallbackQuery, types.Message]):
     """Вывод окон для простых смертных"""
-    markup = InlineKeyboardMarkup()
-    markup.add(InlineKeyboardButton("🔙 Назад", callback_data="back_to_menu"))
+    btn_back = InlineKeyboardMarkup()
+    btn_back.add(InlineKeyboardButton("🔙 Назад", callback_data="back_to_menu"))
     try:
         u_id = event.from_user.id
         dates = sql.get_user_dates(u_id)
@@ -34,12 +34,12 @@ async def search_window_user_handler(event: Union[types.CallbackQuery, types.Mes
         if not dates:
             await send_result_text(event,
                                    "⚠️ Вы не указали дату!",
-                                   reply_markup=markup)
+                                   reply_markup=btn_back)
             return
         elif not group_ids:
             await send_result_text(event,
                                    "⚠️ Вы не указали группы!",
-                                   reply_markup=markup)
+                                   reply_markup=btn_back)
             return
 
         # Генерация свободных окон
@@ -58,7 +58,7 @@ async def search_window_user_handler(event: Union[types.CallbackQuery, types.Mes
             result_text = "\n".join(result_lines)
 
         # Отправка сообщения
-        await send_result_text(event, result_text, reply_markup=markup)
+        await send_result_text(event, result_text, reply_markup=btn_back)
 
     except Exception as e:
         logger.warning(f"Произошла ошибка при выводе окон обычному пользователю: {e}")
