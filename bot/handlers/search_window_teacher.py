@@ -56,14 +56,18 @@ async def send_free_windows_menu(call: types.CallbackQuery, state: FSMContext, p
             await back_to_main(
                 call=call,
                 state=state,
-                text="⚠️ Вы не указали дату!"
+                text="⚠️ Вы не указали дату!\n"
+                     "\n"
+                     "Перейдите во вкладку 'Даты' для ввода даты"
             )
             return
         elif not group_ids:
             await back_to_main(
                 call=call,
                 state=state,
-                text="⚠️ Вы не указали группы!"
+                text="⚠️ Вы не указали группы!\n"
+                     "\n"
+                     "Перейдите во вкладку 'Группы' для ввода групп"
             )
             return
 

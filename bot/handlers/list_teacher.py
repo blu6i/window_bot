@@ -52,7 +52,7 @@ async def add_teacher(msg: types.Message, state: FSMContext):
         teacher = msg.text.strip()
         u_id = msg.from_user.id
         teachers = sql.get_teachers_sub(teacher)
-        if teacher:
+        if teachers:
             teachers_name = teachers['teachers']
             teachers_name.sort()
             await state.update_data(found_teachers=teachers_name)

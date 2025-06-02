@@ -33,12 +33,16 @@ async def search_window_user_handler(event: Union[types.CallbackQuery, types.Mes
         # Проверка данных пользователя
         if not dates:
             await send_result_text(event,
-                                   "⚠️ Вы не указали дату!",
+                                   "⚠️ Вы не указали дату!\n"
+                                   "\n"
+                                   "Перейдите во вкладку 'Даты' для ввода даты",
                                    reply_markup=btn_back)
             return
         elif not group_ids:
             await send_result_text(event,
-                                   "⚠️ Вы не указали группы!",
+                                   "⚠️ Вы не указали группы!\n"
+                                   "\n"
+                                   "Перейдите во вкладку 'Группы' для ввода групп",
                                    reply_markup=btn_back)
             return
 
